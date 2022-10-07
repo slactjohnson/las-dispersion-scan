@@ -1,0 +1,37 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: las_dispersion_scan
+  version: {{ data.get('version') }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  noarch: python
+
+requirements:
+  build:
+    - python >=3.9
+    - setuptools
+  run:
+    - python >=3.9
+    - Pillow
+    - h5py
+    - matplotlib
+    - numpy
+    - qtpy
+    - scipy
+
+test:
+  imports:
+    - las_dispersion_scan
+  requires:
+    - pytest
+
+about:
+  home: https://github.com/pcdshub/las-dispersion-scan
+  license: LicenseRef-BSD-3-Clause-SLAC
+  license_family: BSD
+  summary: Laser dispersion scan utilities for the LCLS

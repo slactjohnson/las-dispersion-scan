@@ -1,0 +1,11 @@
+[run]
+source =
+    las_dispersion_scan
+[report]
+omit =
+    #versioning
+    .*version.*
+    *_version.py
+    #tests
+    *test*
+    las_dispersion_scan/tests/*
