@@ -1,4 +1,7 @@
 import dataclasses
+import enum
+from typing import Any, Optional
+
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
@@ -6,8 +9,6 @@ import pypret
 import pypret.frequencies
 import pypret.graphics
 from matplotlib.ticker import EngFormatter
-import enum
-from typing import Any, Optional
 
 
 class PlotXAxis(str, enum.Enum):
@@ -86,6 +87,9 @@ class RetrievalResultPlot:
         fundamental_wavelength: Optional[float] = None,
         FTL=0,
     ):
+        xaxis = PlotXAxis(xaxis)
+        yaxis = PlotYAxis(yaxis)
+
         # reconstruct a pulse from that
         pulse = pypret.Pulse(
             self.retrieval_result.pnps.ft, self.retrieval_result.pnps.w0, unit="om"
@@ -125,7 +129,7 @@ class RetrievalResultPlot:
             field3,
             ax1,
             ax12,
-            yaxis=yaxis,
+            yaxis=yaxis.value,
             phase_blanking=phase_blanking,
             limit=limit,
             phase_blanking_threshold=phase_blanking_threshold,
@@ -143,12 +147,10 @@ class RetrievalResultPlot:
         ax1.xaxis.set_major_formatter(fx)
         ax1.set_title(f"time domain @ {self.final_position:.3f} mm (FWHM = {fwhm} fs)")
         ax1.set_xlabel("time")
-        ax1.set_ylabel(yaxis)
+        ax1.set_ylabel(yaxis.value)
         ax12.set_ylabel("phase (rad)")
-        ax1.legend([li11, li12], [yaxis, "phase"])
-        ax1.set_xlim(
-            [-10 * 1e-15 * np.round(fwhm, 0), 10 * 1e-15 * np.round(fwhm, 0)]
-        )  #  Test
+        ax1.legend([li11, li12], [yaxis.value, "phase"])
+        ax1.set_xlim([-10 * 1e-15 * np.round(fwhm, 0), 10 * 1e-15 * np.round(fwhm, 0)])
 
         # frequency domain
         if oversampling:

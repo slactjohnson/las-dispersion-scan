@@ -99,14 +99,14 @@ def run_general_scan():
 
     # Filepaths
     # Data directory
-    path_data = r"/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_08_15/Dscan_7"
+    # path_data = r"/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_08_15/Dscan_7"
     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/CXI/2022_05_10/amplifier_dscan_CXI_20220510_2'
     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_06_29/Dscan_run'
     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/Varian/2022_07_23/GSCAN2'
     # Fundamental subpath
-    path_sub_fund = r"fund"
+    # path_sub_fund = r"fund"
     # d-scan subpath
-    path_sub_scan = r"scan"
+    # path_sub_scan = r"scan"
     # pickle subpath
     # path_sub_pickle = r"out1"
 
@@ -171,9 +171,6 @@ def run_general_scan():
     # Move dscan stage to position indicated above?
     final_stage_move = False
 
-    path_full_fund = os.path.join(path_data, path_sub_fund + ".dat")
-    path_full_scan = os.path.join(path_data, path_sub_scan + ".dat")
-
     scan = PrototypeScan(
         wavelength_fund=wavelength_fund,
         method_pick=method_pick,
@@ -182,8 +179,6 @@ def run_general_scan():
         take_fund=take_fund,
         auto_fund=auto_fund,
         take_scan=take_scan,
-        path_full_fund=path_full_fund,
-        path_full_scan=path_full_scan,
         update_txt=update_txt,
         final_stage_move=final_stage_move,
         wedge_angle=wedge_angle,
@@ -224,8 +219,6 @@ class PrototypeScan:
         take_fund: bool,
         auto_fund: bool,
         take_scan: bool,
-        path_full_fund: str,
-        path_full_scan: str,
         update_txt: bool,
         final_stage_move: bool,
         wedge_angle: int,
@@ -257,12 +250,8 @@ class PrototypeScan:
         self.take_fund = take_fund
         self.auto_fund = auto_fund
         self.take_scan = take_scan
-        self.path_full_fund = path_full_fund
-        self.path_full_scan = path_full_scan
         self.update_txt = update_txt
         self.wedge_angle = wedge_angle
-        self.exists_fund = os.path.exists(path_full_fund)
-        self.exists_scan = os.path.exists(path_full_scan)
 
         if self.take_fund:
             if None in [preview, spec_time_fund, spec_avgs_fund, spec_fund_range]:
@@ -375,32 +364,91 @@ class PrototypeScan:
             fund_data=...,
         )
 
-    def load_old_text_format(self, old_path: str) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Load fundamental spectrum and scan spectra from the "old" (original?)
-        .txt file format.
 
-        Returns
-        -------
-        np.ndarray
-            The fundamental spectrum from fund_conv.txt
-        np.ndarray
-            The scan spectra from dscan_conv.txt, transposed appropriately
-        """
-        old_fund = np.loadtxt(os.path.join(old_path, "fund_conv.txt"))
-        # np.savetxt(path_full_fund, old_fund)
-        old_scan = np.loadtxt(os.path.join(old_path, "dscan_conv.txt"))
-        M = np.empty([len(old_scan[0, 1:]), len(old_scan[:, 0])])
-        M[0, 1:] = old_scan[1:, 0].transpose()
-        M[1:, 0] = old_scan[0, 2:].transpose()
-        M[1:, 1:] = old_scan[1:, 2:].transpose()
-        return old_fund, M
-        # np.savetxt(path_full_scan, M)
+def load_old_text_format(path: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Load fundamental spectrum and scan spectra from the "old" (original?)
+    .txt file format.
+
+    Parameters
+    ----------
+    path : str
+        Directory where the old files are to be found.
+
+    Returns
+    -------
+    np.ndarray
+        The fundamental spectrum from fund_conv.txt
+    np.ndarray
+        The scan spectra from dscan_conv.txt, transposed appropriately
+    """
+    fund_conv = np.loadtxt(os.path.join(path, "fund_conv.txt"))
+    # np.savetxt(path_full_fund, old_fund)
+    dscan_conv = np.loadtxt(os.path.join(path, "dscan_conv.txt"))
+    result = np.empty([len(dscan_conv[0, 1:]), len(dscan_conv[:, 0])])
+    result[0, 1:] = dscan_conv[1:, 0].transpose()
+    result[1:, 0] = dscan_conv[0, 2:].transpose()
+    result[1:, 1:] = dscan_conv[1:, 2:].transpose()
+    # np.savetxt(path_full_scan, result)
+    return fund_conv, result
+
+
+def load_fundamental_data(path: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Load fundamental spectrum and scan spectra from the "new" .dat format.
+
+    Parameters
+    ----------
+    path : str
+        Directory where the old files are to be found.
+
+    Returns
+    -------
+    np.ndarray
+        The fundamental wavelengths.
+    np.ndarray
+        The fundamental intensities.
+    """
+    fund_data = np.loadtxt(os.path.join(path, "fund.dat"))
+    wavelengths = fund_data[:, 0] * 1e-9
+    intensities = fund_data[:, 1]
+    intensities -= np.average(intensities[:7])
+    # intensities *= wavelengths * wavelengths
+    return wavelengths, intensities
+
+
+def load_scan_data(path: str, blur_sigma: int = 0) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Load scan positions and spectra from the new .dat format.
+
+    Parameters
+    ----------
+    path : str
+        Directory where the old files are to be found.
+
+    Returns
+    -------
+    np.ndarray
+        Scan positions
+    np.ndarray
+        Wavelengths
+    np.ndarray
+        Normalized intensities
+    """
+    scan_data = np.loadtxt(os.path.join(path, "scan.dat"))
+    positions = scan_data[0, 1:] * 1e-3
+    wavelengths = scan_data[1:, 0] * 1e-9
+    intensities = scan_data[1:, 1:].transpose()
+    intensities /= np.amax(intensities)
+    return positions, wavelengths, intensities
 
 
 def run_pypret(
-    fund_data: np.ndarray,
-    scan_data: np.ndarray,
+    fund_wavelength: np.ndarray,
+    fund_intensities: np.ndarray,
+    scan_positions: np.ndarray,
+    scan_wavelength: np.ndarray,
+    scan_intensities: np.ndarray,
     material: Material,
     method: PulseAnalysisMethod,
     nlin_process: NonlinearProcess,
@@ -414,12 +462,6 @@ def run_pypret(
     spec_fund_range: Tuple[float, float] = (400, 600),
     spec_scan_range: Tuple[float, float] = (200, 300),
 ):
-    # Load fundamental
-    fund_wavelength = fund_data[:, 0] * 1e-9
-    fund_intensities = fund_data[:, 1]
-    fund_intensities -= np.average(fund_intensities[:7])
-    # fund_intensities *= fund_wavelength * fund_wavelength
-
     # Clean fundamental by truncating wavelength
     fund_wavelength_idx = (fund_wavelength > spec_fund_range[0] * 1e-9) & (
         fund_wavelength < spec_fund_range[1] * 1e-9
@@ -479,11 +521,6 @@ def run_pypret(
         plt.title(f"Fundamental Spectrum (FTL) = {FTL * 1e15:.1f} fs")
         plt.show()
 
-    # Load scan
-    scan_positions = scan_data[0, 1:] * 1e-3
-    scan_wavelength = scan_data[1:, 0] * 1e-9
-    scan_intensities = scan_data[1:, 1:].transpose()
-    scan_intensities /= np.amax(scan_intensities)
     scan_intensities = gaussian_filter(scan_intensities, sigma=blur_sigma)
 
     # Clean scan by truncating wavelength
