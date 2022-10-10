@@ -1,7 +1,7 @@
+import dataclasses
 import enum
 import logging
 import os
-import sys
 import time
 from typing import Optional, Tuple
 
@@ -77,251 +77,136 @@ def get_fundamental_spectrum(
     return np.column_stack((wavelength_fund, intensities_fund))
 
 
-def run_general_scan():
-    # Method Parameters (see line 455 for documentation in pnps)
-    # Set wavelength (optional)
-    wavelength_fund = 490  # 800 490
-    # Select method of analyzing pulse
-    method_pick = PulseAnalysisMethod.dscan
-    # Select nonlinear process
-    nlin_process = NonlinearProcess.shg
-    # Select the material (for the d-scan)
-    material_pick = Material.bk7
+# def run_general_scan():
+#     # Method Parameters (see line 455 for documentation in pnps)
+#     # Set wavelength (optional)
+#     wavelength_fund = 490  # 800 490
+#     # Select method of analyzing pulse
+#     method_pick = PulseAnalysisMethod.dscan
+#     # Select nonlinear process
+#     nlin_process = NonlinearProcess.shg
+#     # Select the material (for the d-scan)
+#     material_pick = Material.bk7
 
-    # Collect fundamental?
-    take_fund = False
-    # Collect d-scan?
-    take_scan = False
-    # Use Thorlabs stage to automatically collect fundamental?
-    auto_fund = True
-    # Preview spectra?
-    preview = True
+#     # Collect fundamental?
+#     take_fund = False
+#     # Collect d-scan?
+#     take_scan = False
+#     # Use Thorlabs stage to automatically collect fundamental?
+#     auto_fund = True
+#     # Preview spectra?
+#     preview = True
 
-    # Filepaths
-    # Data directory
-    # path_data = r"/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_08_15/Dscan_7"
-    # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/CXI/2022_05_10/amplifier_dscan_CXI_20220510_2'
-    # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_06_29/Dscan_run'
-    # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/Varian/2022_07_23/GSCAN2'
-    # Fundamental subpath
-    # path_sub_fund = r"fund"
-    # d-scan subpath
-    # path_sub_scan = r"scan"
-    # pickle subpath
-    # path_sub_pickle = r"out1"
+#     # Filepaths
+#     # Data directory
+#     # path_data = r"/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_08_15/Dscan_7"
+#     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/CXI/2022_05_10/amplifier_dscan_CXI_20220510_2'
+#     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_06_29/Dscan_run'
+#     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/Varian/2022_07_23/GSCAN2'
+#     # Fundamental subpath
+#     # path_sub_fund = r"fund"
+#     # d-scan subpath
+#     # path_sub_scan = r"scan"
+#     # pickle subpath
+#     # path_sub_pickle = r"out1"
 
-    # Conversion from previously collected data
-    # Convert previously collected .txt files to .dat?
-    update_txt = False
+#     # Conversion from previously collected data
+#     # Convert previously collected .txt files to .dat?
+#     update_txt = False
 
-    # Spectrometer settings
-    # Fundamental integration time (ms)
-    spec_time_fund = 20000
-    # Fundamental averages
-    spec_avgs_fund = 30
-    # Scan integration time (ms)
-    spec_time_scan = 250000
-    # Scan averages
-    spec_avgs_scan = 4
+#     # Spectrometer settings
+#     # Fundamental integration time (ms)
+#     spec_time_fund = 20000
+#     # Fundamental averages
+#     spec_avgs_fund = 30
+#     # Scan integration time (ms)
+#     spec_time_scan = 250000
+#     # Scan averages
+#     spec_avgs_scan = 4
 
-    # Spectrum window edge parameters
-    # Fundamental spectrum window
-    spec_fund_range = (400, 600)  # [650, 950] [400, 600]
-    # Scan spectrum window
-    spec_scan_range = (200, 300)  # [300, 500] [200, 300]
+#     # Spectrum window edge parameters
+#     # Fundamental spectrum window
+#     spec_fund_range = (400, 600)  # [650, 950] [400, 600]
+#     # Scan spectrum window
+#     spec_scan_range = (200, 300)  # [300, 500] [200, 300]
 
-    # Newport stage parameters
-    # Center stage position of d-scan
-    scan_pos_center = 0.1
-    # Amplitude of scan
-    scan_amplitude_negative = 0.50
-    scan_amplitude_positive = 0.50
-    # Number of points in d-scan
-    scan_points = 100
-    # Wedge angle (for traditional d-scan, not grating)
-    wedge_angle = 8  # (degrees)
-    # COM port
-    ESP_COM_port = "COM8"
-    # Axis of stage on controller
-    ESP_axis_stage_grating = 1
+#     # Newport stage parameters
+#     # Center stage position of d-scan
+#     scan_pos_center = 0.1
+#     # Amplitude of scan
+#     scan_amplitude_negative = 0.50
+#     scan_amplitude_positive = 0.50
+#     # Number of points in d-scan
+#     scan_points = 100
+#     # Wedge angle (for traditional d-scan, not grating)
+#     wedge_angle = 8  # (degrees)
+#     # COM port
+#     ESP_COM_port = "COM8"
+#     # Axis of stage on controller
+#     ESP_axis_stage_grating = 1
 
-    # Thorlabs stage parameters (for automatic fundamental collection)
-    # Home actuator initially?
-    auto_fund_home = False
-    # Standby position
-    auto_fund_pos_standby = 0
-    # Fundamental measurement position
-    auto_fund_pos_fund = 13.3
-    # d-scan measurement position
-    auto_fund_pos_scan = 0.5
-    # Controller ID number
-    auto_fund_ID = 27250600
+#     # Thorlabs stage parameters (for automatic fundamental collection)
+#     # Home actuator initially?
+#     auto_fund_home = False
+#     # Standby position
+#     auto_fund_pos_standby = 0
+#     # Fundamental measurement position
+#     auto_fund_pos_fund = 13.3
+#     # d-scan measurement position
+#     auto_fund_pos_scan = 0.5
+#     # Controller ID number
+#     auto_fund_ID = 27250600
 
-    # Pypret parameters
-    # Strength of Gaussian blur applied to raw data (standard deviations)
-    pypret_blur_sigma = 0
-    # Number of grid points in frequency and time axes
-    pypret_grid_points = 3000  # 3000
-    # Bandwidth around center wavelength for frequency and time axes (nm)
-    pypret_grid_bandwidth_wl = 950  # 1500 950
-    # Maximum number of iterations
-    pypret_max_iter = 30  # 32
-    # Grating stage position for pypret plot OR glass insertion stage position (mm, use None for shortest duration)
-    pypret_plot_position = None  # 1.2 (mm)
-    # Move dscan stage to position indicated above?
-    final_stage_move = False
-
-    scan = PrototypeScan(
-        wavelength_fund=wavelength_fund,
-        method_pick=method_pick,
-        nlin_process=nlin_process,
-        material_pick=material_pick,
-        take_fund=take_fund,
-        auto_fund=auto_fund,
-        take_scan=take_scan,
-        update_txt=update_txt,
-        final_stage_move=final_stage_move,
-        wedge_angle=wedge_angle,
-        preview=preview,
-        spec_time_fund=spec_time_fund,
-        spec_avgs_fund=spec_avgs_fund,
-        spec_time_scan=spec_time_scan,
-        spec_avgs_scan=spec_avgs_scan,
-        spec_fund_range=spec_fund_range,
-        spec_scan_range=spec_scan_range,
-        scan_pos_center=scan_pos_center,
-        scan_points=scan_points,
-        scan_amplitude_negative=scan_amplitude_negative,
-        scan_amplitude_positive=scan_amplitude_positive,
-        ESP_COM_port=ESP_COM_port,
-        ESP_axis_stage_grating=ESP_axis_stage_grating,
-        auto_fund_home=auto_fund_home,
-        auto_fund_ID=auto_fund_ID,
-        auto_fund_pos_standby=auto_fund_pos_standby,
-        auto_fund_pos_fund=auto_fund_pos_fund,
-        auto_fund_pos_scan=auto_fund_pos_scan,
-        pypret_blur_sigma=pypret_blur_sigma,
-        pypret_grid_points=pypret_grid_points,
-        pypret_grid_bandwidth_wl=pypret_grid_bandwidth_wl,
-        pypret_max_iter=pypret_max_iter,
-        pypret_plot_position=pypret_plot_position,
-    )
-    scan.run()
+#     # Pypret parameters
+#     # Strength of Gaussian blur applied to raw data (standard deviations)
+#     pypret_blur_sigma = 0
+#     # Number of grid points in frequency and time axes
+#     pypret_grid_points = 3000  # 3000
+#     # Bandwidth around center wavelength for frequency and time axes (nm)
+#     pypret_grid_bandwidth_wl = 950  # 1500 950
+#     # Maximum number of iterations
+#     pypret_max_iter = 30  # 32
+#     # Grating stage position for pypret plot OR glass insertion stage position (mm, use None for shortest duration)
+#     pypret_plot_position = None  # 1.2 (mm)
+#     # Move dscan stage to position indicated above?
+#     final_stage_move = False
 
 
+@dataclasses.dataclass
 class PrototypeScan:
-    def __init__(
-        self,
-        wavelength_fund: int,
-        method_pick: PulseAnalysisMethod,
-        nlin_process: NonlinearProcess,
-        material_pick: Material,
-        take_fund: bool,
-        auto_fund: bool,
-        take_scan: bool,
-        update_txt: bool,
-        final_stage_move: bool,
-        wedge_angle: int,
-        preview: bool = True,
-        spec_time_fund: int = 20_000,
-        spec_avgs_fund: int = 30,
-        spec_time_scan: int = 250_000,
-        spec_avgs_scan: int = 4,
-        spec_fund_range: Tuple[int, int] = (400, 600),
-        spec_scan_range: Tuple[int, int] = (200, 300),
-        scan_pos_center: float = 0.1,
-        scan_points: int = 100,
-        scan_amplitude_negative: float = 0.5,
-        scan_amplitude_positive: float = 0.5,
-        ESP_COM_port: str = "COM1",
-        ESP_axis_stage_grating: int = 1,
-        auto_fund_home: bool = False,
-        auto_fund_ID: int = 27_250_600,
-        auto_fund_pos_standby: int = 0,
-        auto_fund_pos_fund: float = 13.3,
-        auto_fund_pos_scan: float = 0.5,
-        pypret_blur_sigma: int = 0,
-        pypret_grid_points: int = 3000,
-        pypret_grid_bandwidth_wl: int = 950,
-        pypret_max_iter: int = 30,
-        pypret_plot_position: Optional[float] = None,
-    ):
-        self.material_pick = material_pick
-        self.take_fund = take_fund
-        self.auto_fund = auto_fund
-        self.take_scan = take_scan
-        self.update_txt = update_txt
-        self.wedge_angle = wedge_angle
-
-        if self.take_fund:
-            if None in [preview, spec_time_fund, spec_avgs_fund, spec_fund_range]:
-                sys.exit("Exit: Undefined fundamental parameter(s)")
-            self.preview = preview
-            self.spec_time_fund = spec_time_fund
-            self.spec_avgs_fund = spec_avgs_fund
-            self.spec_fund_range = spec_fund_range
-
-        if self.auto_fund:
-            if None in [
-                auto_fund_home,
-                auto_fund_ID,
-                auto_fund_pos_standby,
-                auto_fund_pos_fund,
-                auto_fund_pos_scan,
-            ]:
-                sys.exit("Exit: Undefined auto_fund parameter(s)")
-            self.auto_fund_home = auto_fund_home
-            self.auto_fund_ID = auto_fund_ID
-            self.auto_fund_pos_standby = auto_fund_pos_standby
-            self.auto_fund_pos_fund = auto_fund_pos_fund
-            self.auto_fund_pos_scan = auto_fund_pos_scan
-
-        if self.take_scan:
-            if None in [
-                preview,
-                spec_time_scan,
-                spec_avgs_scan,
-                spec_scan_range,
-                scan_pos_center,
-                scan_points,
-                scan_amplitude_negative,
-                scan_amplitude_positive,
-                ESP_COM_port,
-                ESP_axis_stage_grating,
-            ]:
-                sys.exit("Exit: Undefined scan parameter(s)")
-            self.preview = preview
-            self.spec_time_scan = spec_time_scan
-            self.spec_avgs_scan = spec_avgs_scan
-            self.spec_fund_range = spec_fund_range
-            self.scan_pos_center = scan_pos_center
-            self.scan_points = scan_points
-            self.scan_amplitude_negative = scan_amplitude_negative
-            self.scan_amplitude_positive = scan_amplitude_positive
-            self.ESP_COM_port = ESP_COM_port
-            self.ESP_axis_stage_grating = ESP_axis_stage_grating
-
-        if None in [
-            pypret_blur_sigma,
-            pypret_grid_points,
-            pypret_grid_bandwidth_wl,
-            pypret_max_iter,
-        ]:
-            sys.exit("Exit: Undefined pypret parameter(s)")
-        self.wavelength_fund = wavelength_fund
-        self.method_pick = method_pick
-        self.nlin_process = nlin_process
-        self.pypret_blur_sigma = pypret_blur_sigma
-        self.pypret_grid_points = pypret_grid_points
-        self.pypret_freq_bandwidth_wl = pypret_grid_bandwidth_wl
-        self.pypret_max_iter = pypret_max_iter
-        self.pypret_plot_position = pypret_plot_position
-        self.spec_fund_range = spec_fund_range
-        self.spec_scan_range = spec_scan_range
-        self.update_txt = update_txt
-        # self.old_path_fund = old_path_fund
-        # self.old_path_scan = old_path_scan
-        self.final_stage_move = final_stage_move
+    wavelength_fund: int
+    method_pick: PulseAnalysisMethod
+    nlin_process: NonlinearProcess
+    material_pick: Material
+    take_fund: bool
+    auto_fund: bool
+    take_scan: bool
+    update_txt: bool
+    final_stage_move: bool
+    wedge_angle: int
+    preview: bool = True
+    spec_time_fund: int = 20_000
+    spec_avgs_fund: int = 30
+    spec_time_scan: int = 250_000
+    spec_avgs_scan: int = 4
+    spec_fund_range: Tuple[int, int] = (400, 600)
+    spec_scan_range: Tuple[int, int] = (200, 300)
+    scan_pos_center: float = 0.1
+    scan_points: int = 100
+    scan_amplitude_negative: float = 0.5
+    scan_amplitude_positive: float = 0.5
+    ESP_COM_port: str = "COM1"
+    ESP_axis_stage_grating: int = 1
+    auto_fund_home: bool = False
+    auto_fund_ID: int = 27_250_600
+    auto_fund_pos_standby: int = 0
+    auto_fund_pos_fund: float = 13.3
+    auto_fund_pos_scan: float = 0.5
+    pypret_blur_sigma: int = 0
+    pypret_grid_points: int = 3000
+    pypret_grid_bandwidth_wl: int = 950
+    pypret_max_iter: int = 30
+    pypret_plot_position: Optional[float] = None
 
     def run(self):
         # Collect fundamental
