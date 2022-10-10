@@ -122,11 +122,12 @@ class SpectrumData:
     intensities: np.ndarray
 
     def get_pulse_from_spectrum(self, ft: pypret.FourierTransform) -> pypret.Pulse:
-        _, _, fund_intensities_bkg_sub = self.subtract_background()
+        pulse = pypret.Pulse(ft, self.raw_center)
+        _, fund_intensities_bkg_sub = self.subtract_background()
         return pulse_from_spectrum(
             self.wavelengths,
             fund_intensities_bkg_sub,
-            pulse=pypret.Pulse(ft, self.raw_center),
+            pulse=pulse,
         )
 
     def get_fourier_transform_limit(self, ft: pypret.FourierTransform) -> float:
@@ -250,16 +251,12 @@ class SpectrumData:
         intensities_bkg_sub = self.intensities - intensities_bkg_fit
         intensities_bkg_sub /= np.max(intensities_bkg_sub)
         intensities_bkg_sub[intensities_bkg_sub < 0.0025] = 0
-        return (
-            fit,
-            intensities_bkg_fit,
-            intensities_bkg_sub,
-        )
+        return (intensities_bkg_fit, intensities_bkg_sub)
 
     def plot(self, pulse: Optional[pypret.Pulse] = None):
         fig, ax = plt.subplots()
         wavelength_bkg, intensities_bkg = self.get_background(count=15)
-        _, intensities_bkg_fit, _ = self.subtract_background()
+        intensities_bkg_fit, _ = self.subtract_background(count=15)
 
         plt.plot(self.wavelengths * 1e9, self.intensities, "k", label="All data")
         plt.plot(
@@ -294,19 +291,21 @@ class ScanData:
     #: Normalized intensities
     intensities: np.ndarray
 
-    def subtract_background_for_all_positions(self) -> None:
+    def subtract_background_for_all_positions(self, count: int = 15) -> None:
         """
         Clean scan by subtracting linear background for each stage position.
 
         Works in-place.
         """
-        scan_wavelength_bkg = np.hstack((self.wavelengths[:15], self.wavelengths[-15:]))
+        wavelength_bkg = np.hstack(
+            (self.wavelengths[:count], self.wavelengths[-count:])
+        )
         for i in range(len(self.positions)):
-            scan_intensities_bkg = np.hstack(
-                (self.intensities[i, :15], self.intensities[i, -15:])
+            intensities_bkg = np.hstack(
+                (self.intensities[i, :count], self.intensities[i, -count:])
             )
-            p = np.polyfit(scan_wavelength_bkg, scan_intensities_bkg, 1)
-            self.intensities[i, :] -= self.wavelengths * p[0] + p[1]
+            fit = np.polyfit(wavelength_bkg, intensities_bkg, 1)
+            self.intensities[i, :] -= self.wavelengths * fit[0] + fit[1]
 
     def truncate_wavelength(
         self, range_low: float, range_high: float
@@ -411,6 +410,7 @@ class PypretResult:
     freq_bandwidth_wl: int = 950
     max_iter: int = 30
     plot_position: Optional[float] = None
+    solver: str = "copra"
     spec_fund_range: Tuple[float, float] = (400, 600)
     spec_scan_range: Tuple[float, float] = (200, 300)
     plot: Optional[RetrievalResultPlot] = None
@@ -568,7 +568,7 @@ class PypretResult:
             fill_value=0.0,
         )(self.fund.wavelengths)
 
-        _, _, intensities = self.fund.subtract_background()
+        _, intensities = self.fund.subtract_background()
         intensities *= pypret.lib.best_scale(intensities, result_spec)
         return intensities
 
@@ -598,9 +598,7 @@ class PypretResult:
             dark_signal_range=(0, 10),
         )
         preprocess2(self.trace, pnps)
-
-        # Pypret retrieval
-        return pypret.Retriever(pnps, "copra", verbose=True, maxiter=self.max_iter)
+        return pypret.Retriever(pnps, self.solver, verbose=True, maxiter=self.max_iter)
 
     def _get_retrieval_plot(
         self, plot_position: Optional[float] = None
