@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import enum
 import logging
@@ -229,7 +231,7 @@ class PrototypeScan:
                 logger.info("Continuing...")
             self.spec_fund.collect_intensities()
             fundamental_spectrum = get_fundamental_spectrum(
-                self.spec_fund.wavelength,
+                self.spec_fund.wavelengths,
                 self.spec_fund.intensities,
                 range_low=self.spec_fund_range[0],
                 range_high=self.spec_fund_range[1],
@@ -278,62 +280,188 @@ def load_old_text_format(path: str) -> Tuple[np.ndarray, np.ndarray]:
     return fund_conv, result
 
 
-def load_fundamental_data(path: str) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Load fundamental spectrum and scan spectra from the "new" .dat format.
+@dataclasses.dataclass
+class SpectrumData:
+    wavelengths: np.ndarray
+    intensities: np.ndarray
 
-    Parameters
-    ----------
-    path : str
-        Directory where the old files are to be found.
+    @classmethod
+    def from_txt_file(cls, filename: str) -> SpectrumData:
+        """
+        Load fundamental spectrum data from the old .txt file format.
 
-    Returns
-    -------
-    np.ndarray
-        The fundamental wavelengths.
-    np.ndarray
-        The fundamental intensities.
-    """
-    fund_data = np.loadtxt(os.path.join(path, "fund.dat"))
-    wavelengths = fund_data[:, 0] * 1e-9
-    intensities = fund_data[:, 1]
-    intensities -= np.average(intensities[:7])
-    # intensities *= wavelengths * wavelengths
-    return wavelengths, intensities
+        Parameters
+        ----------
+        filename : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        SpectrumData
+            The loaded data
+        """
+        return cls.from_file(filename)
+
+    @classmethod
+    def from_dat_file(cls, filename: str) -> SpectrumData:
+        """
+        Load fundamental spectrum data from the old .txt file format or the new
+        .dat format.
+
+        Parameters
+        ----------
+        filename : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        SpectrumData
+            The loaded data
+        """
+        return cls.from_file(filename)
+
+    @classmethod
+    def from_path(cls, path: str) -> SpectrumData:
+        """
+        Load spectra from either the old .txt file format or a the new .dat
+        file format, given a path.
+
+        Parameters
+        ----------
+        path : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        ScanData
+            The data from the scan.
+        """
+        try:
+            return cls.from_dat_file(os.path.join(path, "fund.dat"))
+        except FileNotFoundError:
+            ...
+
+        try:
+            return cls.from_txt_file(os.path.join(path, "fund_conv.txt"))
+        except FileNotFoundError:
+            ...
+
+        raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
+
+    @classmethod
+    def from_file(cls, path: str) -> SpectrumData:
+        """
+        Load fundamental spectrum data from the old .txt file format or the new
+        .dat format.
+
+        Parameters
+        ----------
+        path : str
+            Filename that contains the data.
+
+        Returns
+        -------
+        SpectrumData
+            The loaded data
+        """
+        fund_data = np.loadtxt(path)
+        wavelengths = fund_data[:, 0] * 1e-9
+        intensities = fund_data[:, 1]
+        intensities -= np.average(intensities[:7])
+        # intensities *= wavelengths * wavelengths
+        return cls(wavelengths, intensities)
 
 
-def load_scan_data(path: str, blur_sigma: int = 0) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Load scan positions and spectra from the new .dat format.
+@dataclasses.dataclass
+class ScanData:
+    #: Scan positions
+    positions: np.ndarray
+    #: Wavelengths
+    wavelengths: np.ndarray
+    #: Normalized intensities
+    intensities: np.ndarray
 
-    Parameters
-    ----------
-    path : str
-        Directory where the old files are to be found.
+    @classmethod
+    def from_txt_file(cls, filename: str) -> ScanData:
+        """
+        Load scan spectra from the "old" (original?) .txt file format.
 
-    Returns
-    -------
-    np.ndarray
-        Scan positions
-    np.ndarray
-        Wavelengths
-    np.ndarray
-        Normalized intensities
-    """
-    scan_data = np.loadtxt(os.path.join(path, "scan.dat"))
-    positions = scan_data[0, 1:] * 1e-3
-    wavelengths = scan_data[1:, 0] * 1e-9
-    intensities = scan_data[1:, 1:].transpose()
-    intensities /= np.amax(intensities)
-    return positions, wavelengths, intensities
+        Parameters
+        ----------
+        filename : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        ScanData
+            The data from the scan.
+        """
+        dscan_conv = np.loadtxt(filename)
+        result = np.empty([len(dscan_conv[0, 1:]), len(dscan_conv[:, 0])])
+        result[0, 1:] = dscan_conv[1:, 0].transpose()
+        result[1:, 0] = dscan_conv[0, 2:].transpose()
+        result[1:, 1:] = dscan_conv[1:, 2:].transpose()
+        # np.savetxt(path_full_scan, result)
+        return cls(
+            positions=result[0],
+            wavelengths=result[1],
+            intensities=result[2],
+        )
+
+    @classmethod
+    def from_dat_file(cls, filename: str) -> ScanData:
+        """
+        Load scan positions and spectra from the new .dat format.
+
+        Parameters
+        ----------
+        filename : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        ScanData
+            The data from the scan.
+        """
+        scan_data = np.loadtxt(filename)
+        positions = scan_data[0, 1:] * 1e-3
+        wavelengths = scan_data[1:, 0] * 1e-9
+        intensities = scan_data[1:, 1:].transpose()
+        intensities /= np.amax(intensities)
+        return cls(positions, wavelengths, intensities)
+
+    @classmethod
+    def from_path(cls, path: str) -> ScanData:
+        """
+        Load scan positions and spectra from either the old .txt file format
+        or a the new .dat file format, given a path.
+
+        Parameters
+        ----------
+        path : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        ScanData
+            The data from the scan.
+        """
+        try:
+            return cls.from_dat_file(os.path.join(path, "scan.dat"))
+        except FileNotFoundError:
+            ...
+
+        try:
+            return cls.from_txt_file(os.path.join(path, "dscan_conv.txt"))
+        except FileNotFoundError:
+            ...
+
+        raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
 
 
 def run_pypret(
-    fund_wavelength: np.ndarray,
-    fund_intensities: np.ndarray,
-    scan_positions: np.ndarray,
-    scan_wavelength: np.ndarray,
-    scan_intensities: np.ndarray,
+    fund: SpectrumData,
+    scan: ScanData,
     material: Material,
     method: PulseAnalysisMethod,
     nlin_process: NonlinearProcess,
@@ -348,13 +476,13 @@ def run_pypret(
     spec_scan_range: Tuple[float, float] = (200, 300),
 ):
     # Clean fundamental by truncating wavelength
-    fund_wavelength_idx = (fund_wavelength > spec_fund_range[0] * 1e-9) & (
-        fund_wavelength < spec_fund_range[1] * 1e-9
+    fund_wavelength_idx = (fund.wavelengths > spec_fund_range[0] * 1e-9) & (
+        fund.wavelengths < spec_fund_range[1] * 1e-9
     )
-    fund_wavelength = fund_wavelength[fund_wavelength_idx]
-    fund_intensities = fund_intensities[fund_wavelength_idx]
-    wavelength_raw_center = sum(np.multiply(fund_wavelength, fund_intensities)) / sum(
-        fund_intensities
+    fund.wavelengths = fund.wavelengths[fund_wavelength_idx]
+    fund.intensities = fund.intensities[fund_wavelength_idx]
+    wavelength_raw_center = sum(np.multiply(fund.wavelengths, fund.intensities)) / sum(
+        fund.intensities
     )
     # wavelength_raw_center = self.wavelength_fund * 1E-9
     logger.info(f"Fundamental center wavelength: {wavelength_raw_center * 1e9:.1f} nm")
@@ -371,23 +499,23 @@ def run_pypret(
     pulse = pypret.Pulse(ft, wavelength_raw_center)
 
     # Subtract background
-    fund_wavelength_bkg = np.hstack((fund_wavelength[:15], fund_wavelength[-15:]))
-    fund_intensities_bkg = np.hstack((fund_intensities[:15], fund_intensities[-15:]))
+    fund_wavelength_bkg = np.hstack((fund.wavelengths[:15], fund.wavelengths[-15:]))
+    fund_intensities_bkg = np.hstack((fund.intensities[:15], fund.intensities[-15:]))
     p = np.polyfit(fund_wavelength_bkg, fund_intensities_bkg, 1)
-    fund_intensities_bkg_fit = fund_wavelength * p[0] + p[1]
-    fund_intensities_bkg_sub = fund_intensities - fund_intensities_bkg_fit
+    fund_intensities_bkg_fit = fund.wavelengths * p[0] + p[1]
+    fund_intensities_bkg_sub = fund.intensities - fund_intensities_bkg_fit
     fund_intensities_bkg_sub /= np.max(fund_intensities_bkg_sub)
     fund_intensities_bkg_sub[fund_intensities_bkg_sub < 0.0025] = 0
 
     # Fourier limit
-    pulse = pulse_from_spectrum(fund_wavelength, fund_intensities_bkg_sub, pulse=pulse)
+    pulse = pulse_from_spectrum(fund.wavelengths, fund_intensities_bkg_sub, pulse=pulse)
     FTL = pulse.fwhm(dt=pulse.dt / 100)
     logger.info(f"Fourier Transform Limit (FTL): {FTL * 1e15:.1f} fs")
 
     # Plot fundamental
     if verbose:
         fig, ax = plt.subplots()
-        plt.plot(fund_wavelength * 1e9, fund_intensities, "k", label="All data")
+        plt.plot(fund.wavelengths * 1e9, fund.intensities, "k", label="All data")
         plt.plot(
             fund_wavelength_bkg * 1e9,
             fund_intensities_bkg,
@@ -395,7 +523,7 @@ def run_pypret(
             label="Points for fit",
         )
         plt.plot(
-            fund_wavelength * 1e9,
+            fund.wavelengths * 1e9,
             fund_intensities_bkg_fit,
             "r",
             label="Background fit",
@@ -406,31 +534,31 @@ def run_pypret(
         plt.title(f"Fundamental Spectrum (FTL) = {FTL * 1e15:.1f} fs")
         plt.show()
 
-    scan_intensities = gaussian_filter(scan_intensities, sigma=blur_sigma)
+    scan.intensities = gaussian_filter(scan.intensities, sigma=blur_sigma)
 
     # Clean scan by truncating wavelength
-    scan_wavelength_idx = (scan_wavelength > spec_scan_range[0] * 1e-9) & (
-        scan_wavelength < spec_scan_range[1] * 1e-9
+    scan_wavelength_idx = (scan.wavelengths > spec_scan_range[0] * 1e-9) & (
+        scan.wavelengths < spec_scan_range[1] * 1e-9
     )
-    scan_wavelength = scan_wavelength[scan_wavelength_idx]
-    scan_intensities = scan_intensities[:, scan_wavelength_idx]
+    scan.wavelengths = scan.wavelengths[scan_wavelength_idx]
+    scan.intensities = scan.intensities[:, scan_wavelength_idx]
 
     # Clean scan by subtracting linear background for each stage position
-    scan_wavelength_bkg = np.hstack((scan_wavelength[:15], scan_wavelength[-15:]))
-    for i in range(len(scan_positions)):
+    scan_wavelength_bkg = np.hstack((scan.wavelengths[:15], scan.wavelengths[-15:]))
+    for i in range(len(scan.positions)):
         scan_intensities_bkg = np.hstack(
-            (scan_intensities[i, :15], scan_intensities[i, -15:])
+            (scan.intensities[i, :15], scan.intensities[i, -15:])
         )
         p = np.polyfit(scan_wavelength_bkg, scan_intensities_bkg, 1)
-        scan_intensities[i, :] -= scan_wavelength * p[0] + p[1]
+        scan.intensities[i, :] -= scan.wavelengths * p[0] + p[1]
 
     # Defines the proper conversion from stage position
     method_coef = material.get_coefficient(wedge_angle)
 
     trace_raw = pypret.MeshData(
-        scan_intensities,
-        method_coef * (scan_positions - min(scan_positions)),
-        scan_wavelength,
+        scan.intensities,
+        method_coef * (scan.positions - min(scan.positions)),
+        scan.wavelengths,
         labels=["Insertion", "Wavelength"],
         units=["m", "m"],
     )
@@ -454,7 +582,7 @@ def run_pypret(
     )
     trace = preprocess(
         trace_raw,
-        signal_range=(scan_wavelength[0], scan_wavelength[-1]),
+        signal_range=(scan.wavelengths[0], scan.wavelengths[-1]),
         dark_signal_range=(0, 10),
     )
     preprocess2(trace, pnps)
@@ -480,7 +608,7 @@ def run_pypret(
     result_spec = pulse.spectral_intensity
     result_spec = scipy.interpolate.interp1d(
         pulse.wl, result_spec, bounds_error=False, fill_value=0.0
-    )(fund_wavelength)
+    )(fund.wavelengths)
     fund_intensities_bkg_sub *= pypret.lib.best_scale(
         fund_intensities_bkg_sub, result_spec
     )
@@ -511,7 +639,7 @@ def run_pypret(
         plt.close("all")
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        fig = plt.plot(scan_positions * 1e3, fwhm * 1e15)
+        fig = plt.plot(scan.positions * 1e3, fwhm * 1e15)
         ax.tick_params(labelsize=12)
         plt.xlabel("Position (mm)")
         plt.ylabel("FWHM (fs)")
@@ -519,7 +647,7 @@ def run_pypret(
             "Shortest: "
             + str(np.round(result_optimum_fwhm[0] * 1e15, 1))
             + " fs @ "
-            + str(np.round(scan_positions[result_optimum_idx] * 1e3, 3))
+            + str(np.round(scan.positions[result_optimum_idx] * 1e3, 3))
             + "mm"
         )
         plt.ylim(
@@ -535,7 +663,7 @@ def run_pypret(
         ax = fig.add_subplot(111)
         fig = plt.contourf(
             pulse.t * 1e15,
-            scan_positions * 1e3,
+            scan.positions * 1e3,
             result_profile.transpose(),
             200,
             cmap="nipy_spectral",
@@ -550,10 +678,10 @@ def run_pypret(
     # Plot results (Pypret style)
     if plot_position is None:
         pypret_plot_parameter = result_parameter[result_optimum_idx]
-        final_position = scan_positions[result_optimum_idx]
+        final_position = scan.positions[result_optimum_idx]
     else:
         pypret_plot_parameter = result_parameter[
-            (np.nanargmin(np.abs(scan_positions - plot_position * 1e-3)))
+            (np.nanargmin(np.abs(scan.positions - plot_position * 1e-3)))
         ]
         final_position = plot_position
 
@@ -563,11 +691,11 @@ def run_pypret(
         spec_fund_range,
         spec_scan_range,
         final_position,
-        scan_positions,
+        scan.positions,
     )
     plot.plot(
         fundamental=fund_intensities_bkg_sub,
-        fundamental_wavelength=fund_wavelength,
+        fundamental_wavelength=fund.wavelengths,
         oversampling=8,
         phase_blanking=True,
         phase_blanking_threshold=0.01,
@@ -628,13 +756,16 @@ def acquire_data(self):
     self.ESP_stage_device.move_to(
         self.ESP_axis_stage_grating, self.scan_pos_center, True
     )
-    scan_intensities = scan_data[1:, 1:]
-    scan_positions = scan_data[0, 1:]
-    scan_wavelength = scan_data[1:, 0]
+
+    scan = ScanData(
+        positions=scan_data[0, 1:],
+        intensities=scan_data[1:, 1:],
+        wavelengths=scan_data[1:, 0],
+    )
     plt.close("all")
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    fig = plt.contourf(scan_positions, scan_wavelength, scan_intensities.T, 100)
+    fig = plt.contourf(scan.positions, scan.wavelengths, scan.intensities.T, 100)
     ax.set_ylabel("Grating position (mm)", size=12)
     ax.set_xlabel("Wavelength (nm)", size=12)
     ax.tick_params(labelsize=12)
