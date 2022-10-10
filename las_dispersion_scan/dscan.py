@@ -794,10 +794,9 @@ class PypretResult:
         ft = result.get_fourier_transform()
         logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
 
-        pulse = fund.get_pulse_from_spectrum(ft)
-        result.pulse = pulse
+        result.pulse = fund.get_pulse_from_spectrum(ft)
+        result.fourier_transform_limit = result.pulse.fwhm(dt=result.pulse.dt / 100)
 
-        result.fourier_transform_limit = pulse.fwhm(dt=pulse.dt / 100)
         logger.info(
             f"Fourier Transform Limit (FTL): {result.fourier_transform_limit * 1e15:.1f} fs"
         )
@@ -818,12 +817,15 @@ class PypretResult:
         if verbose:
             result.plot_mesh_data(trace_raw)
 
-        retriever = result._get_retriever(pulse)
+        retriever = result._get_retriever(result.pulse)
 
-        pypret.random_gaussian(pulse, result.fourier_transform_limit, phase_max=0.1)
+        pypret.random_gaussian(
+            result.pulse, result.fourier_transform_limit, phase_max=0.1
+        )
 
-        # pypret.random_bigaussian(pulse, FTL, phase_max=0.1, sep)  # Experimental bimodal gaussian
-        retriever.retrieve(result.trace, pulse.spectrum, weights=None)
+        # Experimental bimodal gaussian
+        # pypret.random_bigaussian(result.pulse, result.fourier_transform_limit, phase_max=0.1, sep)
+        retriever.retrieve(result.trace, result.pulse.spectrum, weights=None)
         result.retrieval = cast(RetrievalResultStandin, retriever.result())
 
         # Calculate the RMSE between retrieved and measured fundamental spectrum
