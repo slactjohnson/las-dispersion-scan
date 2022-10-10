@@ -116,129 +116,6 @@ def get_fundamental_spectrum(
     return np.column_stack((wavelength_fund, intensities_fund))
 
 
-# def run_general_scan():
-#     # Method Parameters (see line 455 for documentation in pnps)
-#     # Set wavelength (optional)
-#     wavelength_fund = 490  # 800 490
-#     # Select method of analyzing pulse
-#     method_pick = PulseAnalysisMethod.dscan
-#     # Select nonlinear process
-#     nlin_process = NonlinearProcess.shg
-#     # Select the material (for the d-scan)
-#     material_pick = Material.bk7
-
-#     # Collect fundamental?
-#     take_fund = False
-#     # Collect d-scan?
-#     take_scan = False
-#     # Use Thorlabs stage to automatically collect fundamental?
-#     auto_fund = True
-#     # Preview spectra?
-#     preview = True
-
-#     # Filepaths
-#     # Data directory
-#     # path_data = r"/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_08_15/Dscan_7"
-#     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/CXI/2022_05_10/amplifier_dscan_CXI_20220510_2'
-#     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/XCS/2022_06_29/Dscan_run'
-#     # path_data = r'/Users/aaronghrist/Research/Code/Python Code/general_dscan_v0.0.6/Data/Varian/2022_07_23/GSCAN2'
-#     # Fundamental subpath
-#     # path_sub_fund = r"fund"
-#     # d-scan subpath
-#     # path_sub_scan = r"scan"
-#     # pickle subpath
-#     # path_sub_pickle = r"out1"
-
-#     # Conversion from previously collected data
-#     # Convert previously collected .txt files to .dat?
-#     update_txt = False
-
-#     # Spectrometer settings
-#     # Fundamental integration time (ms)
-#     spec_time_fund = 20000
-#     # Fundamental averages
-#     spec_avgs_fund = 30
-#     # Scan integration time (ms)
-#     spec_time_scan = 250000
-#     # Scan averages
-#     spec_avgs_scan = 4
-
-#     # Spectrum window edge parameters
-#     # Fundamental spectrum window
-#     spec_fund_range = (400, 600)  # [650, 950] [400, 600]
-#     # Scan spectrum window
-#     spec_scan_range = (200, 300)  # [300, 500] [200, 300]
-
-#     # Newport stage parameters
-#     # Center stage position of d-scan
-#     scan_pos_center = 0.1
-#     # Amplitude of scan
-#     scan_amplitude_negative = 0.50
-#     scan_amplitude_positive = 0.50
-#     # Number of points in d-scan
-#     scan_points = 100
-#     # Wedge angle (for traditional d-scan, not grating)
-#     wedge_angle = 8  # (degrees)
-#     # COM port
-#     ESP_COM_port = "COM8"
-#     # Axis of stage on controller
-#     ESP_axis_stage_grating = 1
-
-#     # Thorlabs stage parameters (for automatic fundamental collection)
-#     # Home actuator initially?
-#     auto_fund_home = False
-#     # Standby position
-#     auto_fund_pos_standby = 0
-#     # Fundamental measurement position
-#     auto_fund_pos_fund = 13.3
-#     # d-scan measurement position
-#     auto_fund_pos_scan = 0.5
-#     # Controller ID number
-#     auto_fund_ID = 27250600
-
-#     # Pypret parameters
-#     # Strength of Gaussian blur applied to raw data (standard deviations)
-#     pypret_blur_sigma = 0
-#     # Number of grid points in frequency and time axes
-#     pypret_grid_points = 3000  # 3000
-#     # Bandwidth around center wavelength for frequency and time axes (nm)
-#     pypret_grid_bandwidth_wl = 950  # 1500 950
-#     # Maximum number of iterations
-#     pypret_max_iter = 30  # 32
-#     # Grating stage position for pypret plot OR glass insertion stage position (mm, use None for shortest duration)
-#     pypret_plot_position = None  # 1.2 (mm)
-#     # Move dscan stage to position indicated above?
-#     final_stage_move = False
-
-
-def load_old_text_format(path: str) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Load fundamental spectrum and scan spectra from the "old" (original?)
-    .txt file format.
-
-    Parameters
-    ----------
-    path : str
-        Directory where the old files are to be found.
-
-    Returns
-    -------
-    np.ndarray
-        The fundamental spectrum from fund_conv.txt
-    np.ndarray
-        The scan spectra from dscan_conv.txt, transposed appropriately
-    """
-    fund_conv = np.loadtxt(os.path.join(path, "fund_conv.txt"))
-    # np.savetxt(path_full_fund, old_fund)
-    dscan_conv = np.loadtxt(os.path.join(path, "dscan_conv.txt"))
-    result = np.empty([len(dscan_conv[0, 1:]), len(dscan_conv[:, 0])])
-    result[0, 1:] = dscan_conv[1:, 0].transpose()
-    result[1:, 0] = dscan_conv[0, 2:].transpose()
-    result[1:, 1:] = dscan_conv[1:, 2:].transpose()
-    # np.savetxt(path_full_scan, result)
-    return fund_conv, result
-
-
 @dataclasses.dataclass
 class SpectrumData:
     wavelengths: np.ndarray
@@ -642,8 +519,8 @@ class PypretResult:
         return np.nanargmin(self.fwhm)
 
     @property
-    def optimum_fwhm(self) -> np.ndarray:
-        return self.fwhm[self.optimum_fwhm_idx]
+    def optimum_fwhm(self) -> float:
+        return self.fwhm[self.optimum_fwhm_idx][0]
 
     def plot_fwhm_vs_grating_position(self):
         fig = plt.figure()
@@ -654,7 +531,7 @@ class PypretResult:
         plt.ylabel("FWHM (fs)")
 
         result_optimum_fwhm = self.optimum_fwhm
-        fwhm0 = result_optimum_fwhm[0] * 1e15
+        fwhm0 = result_optimum_fwhm * 1e15
         pos = self.scan.positions[self.optimum_fwhm_idx] * 1e3
         plt.title(f"Shortest: {fwhm0:.1f} fs @ {pos:.3f} mm")
         plt.ylim(
@@ -855,73 +732,3 @@ class PypretResult:
             plt.show()
 
         return result
-
-
-"""
-    def acquire_data(self):
-        motor = None  # TODO
-
-        if self.auto_fund:
-            try:
-                motor.move_to(self.auto_fund_pos_scan, True)
-            except Exception:
-                motor.move_to(self.auto_fund_pos_scan, False)
-                time.sleep(15)
-        self.ESP_stage_device.move_to(
-            self.ESP_axis_stage_grating, self.scan_pos_center, True
-        )
-        # self.spec_scan = oo.spectrum(
-        #     specs.devices,
-        #     integration_time=self.spec_time_scan,
-        #     averages=self.spec_avgs_scan,
-        # )
-        if self.preview:
-            logger.info("Check SHG spectrum. Close window to continue.")
-            self.spec_scan.plot_live(wavelength_limits=self.spec_scan_range)
-            logger.info("Continuing...")
-        self.scan_position_list = []
-        for counter, pos in enumerate(self.scan_points_list):
-            self.ESP_stage_device.move_to(self.ESP_axis_stage_grating, pos, True)
-            self.scan_position_list.append(
-                self.ESP_stage_device.position(self.ESP_axis_stage_grating)
-            )
-            self.spec_scan.collect_intensities()
-            if counter == 0:
-                wavelength = self.spec_scan.wavelength
-                self.wavelength_scan = wavelength[
-                    (wavelength > self.spec_scan_range[0])
-                    & (wavelength < self.spec_scan_range[1])
-                ]
-                wavelength_cut = self.wavelength_scan
-                scan_data = np.insert(wavelength_cut, 0, np.nan)
-            intensities = self.spec_scan.intensities
-            intensities_cut = intensities[
-                (wavelength > self.spec_scan_range[0])
-                & (wavelength < self.spec_scan_range[1])
-            ]
-            intensities_cut_pos = np.insert(
-                intensities_cut, 0, self.scan_position_list[counter]
-            )
-            scan_data = np.column_stack((scan_data, intensities_cut_pos))
-        if not os.path.exists(os.path.dirname(self.path_full_scan)):
-            os.makedirs(os.path.dirname(self.path_full_scan))
-        np.savetxt(self.path_full_scan, scan_data)
-        self.ESP_stage_device.move_to(
-            self.ESP_axis_stage_grating, self.scan_pos_center, True
-        )
-
-        scan = ScanData(
-            positions=scan_data[0, 1:],
-            intensities=scan_data[1:, 1:],
-            wavelengths=scan_data[1:, 0],
-        )
-        plt.close("all")
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        fig = plt.contourf(scan.positions, scan.wavelengths, scan.intensities.T, 100)
-        ax.set_ylabel("Grating position (mm)", size=12)
-        ax.set_xlabel("Wavelength (nm)", size=12)
-        ax.tick_params(labelsize=12)
-        plt.show()
-        return scan_data
-"""
