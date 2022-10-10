@@ -535,6 +535,12 @@ class PypretResult:
     retrieval: RetrievalResultStandin = dataclasses.field(
         default_factory=RetrievalResultStandin
     )
+    pulse: Optional[pypret.Pulse] = None
+    trace_raw: Optional[pypret.MeshData] = None
+    trace: Optional[pypret.MeshData] = None
+    fwhm: np.ndarray = None
+    result_profile: np.ndarray = None
+    result_parameter: np.ndarray = None
 
     def get_fourier_transform(self) -> pypret.FourierTransform:
         # Create frequency-time grid
@@ -562,7 +568,7 @@ class PypretResult:
         )
 
     def get_mesh_data_plot(
-        self, data: Optional[pypret.MeshData] = None, scan_padding_nm=75
+        self, data: Optional[pypret.MeshData] = None, scan_padding_nm: int = 75
     ) -> pypret.MeshDataPlot:
         if data is None:
             data = self.get_mesh_data()
@@ -577,6 +583,117 @@ class PypretResult:
             ]
         )
         return md
+
+    def plot_processed_scan(self, *, scan_padding_nm: int = 75):
+        md = pypret.MeshDataPlot(self.trace, show=False)
+        ax = cast(plt.Axes, md.ax)
+        ax.set_title("Processed scan")
+        ax.set_xlabel("Frequency")
+        ax.set_xlim(
+            [
+                2
+                * np.pi
+                * 2.99792
+                * 1e17
+                / (self.spec_scan_range[1] - scan_padding_nm),
+                2
+                * np.pi
+                * 2.99792
+                * 1e17
+                / (self.spec_scan_range[0] + scan_padding_nm),
+            ]
+        )
+        return md
+
+    def _calculate_fwhm_and_profile(self):
+        pulse = self.pulse
+        assert pulse is not None
+        assert self.retrieval.pnps is not None
+        result_parameter = self.retrieval.parameter
+        result_parameter_mid_idx = np.floor(len(pulse.field) / 2) + 1
+        result_profile = np.zeros((len(pulse.field), len(result_parameter)))
+        fwhm = np.zeros((len(result_parameter), 1))
+        for idx, param in enumerate(result_parameter):
+            pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
+                param
+            )
+            profile = np.power(np.abs(pulse.field), 2)[:]
+            profile_max_idx = np.argmax(profile)
+            result_profile[:, idx] = np.roll(
+                profile, -round(profile_max_idx - result_parameter_mid_idx)
+            )
+            try:
+                fwhm[idx] = pulse.fwhm(dt=pulse.dt / 100)
+            except Exception:
+                fwhm[idx] = np.nan
+
+        self.fwhm = fwhm
+        self.result_profile = result_profile
+        self.result_parameter = result_parameter
+
+    @property
+    def optimum_fwhm_idx(self) -> np.ndarray:
+        return np.nanargmin(self.fwhm)
+
+    @property
+    def optimum_fwhm(self) -> np.ndarray:
+        return self.fwhm[self.optimum_fwhm_idx]
+
+    def plot_fwhm_vs_grating_position(self):
+        fig = plt.figure()
+        ax = cast(plt.Axes, fig.add_subplot(111))
+        fig = plt.plot(self.scan.positions * 1e3, self.fwhm * 1e15)
+        ax.tick_params(labelsize=12)
+        plt.xlabel("Position (mm)")
+        plt.ylabel("FWHM (fs)")
+
+        result_optimum_fwhm = self.optimum_fwhm
+        fwhm0 = result_optimum_fwhm[0] * 1e15
+        pos = self.scan.positions[self.optimum_fwhm_idx] * 1e3
+        plt.title(f"Shortest: {fwhm0:.1f} fs @ {pos:.3f} mm")
+        plt.ylim(
+            0,
+            min([np.nanmax(self.fwhm * 1e15), 4 * result_optimum_fwhm * 1e15]),
+        )
+        return fig
+
+    def plot_temporal_profile_vs_grating_position(self):
+        assert self.pulse is not None
+        fig = plt.figure()
+        ax = cast(plt.Axes, fig.add_subplot(111))
+        fig = plt.contourf(
+            self.pulse.t * 1e15,
+            self.scan.positions * 1e3,
+            self.result_profile.transpose(),
+            200,
+            cmap="nipy_spectral",
+        )
+        ax.tick_params(labelsize=12)
+        plt.xlabel("Time (fs)")
+        plt.ylabel("Position (mm)")
+        plt.title("Dscan Temporal Profile")
+        plt.xlim(-8 * self.optimum_fwhm * 1e15, 8 * self.optimum_fwhm * 1e15)
+        return fig
+
+    def _get_retriever(
+        self, pulse: pypret.Pulse
+    ) -> pypret.retrieval.retriever.BaseRetriever:
+        assert self.trace_raw is not None
+        pnps = pypret.PNPS(
+            pulse,
+            method=self.method,
+            process=self.nlin_process,
+            material=self.material.pypret_material,
+        )
+        self.trace = preprocess(
+            self.trace_raw,
+            signal_range=(self.scan.wavelengths[0], self.scan.wavelengths[-1]),
+            dark_signal_range=(0, 10),
+        )
+        preprocess2(self.trace, pnps)
+
+        # Pypret retrieval
+        return pypret.Retriever(pnps, "copra", verbose=True, maxiter=self.max_iter)
 
     @classmethod
     def from_data(
@@ -625,6 +742,8 @@ class PypretResult:
         _, _, fund_intensities_bkg_sub = fund.subtract_background()
 
         pulse = fund.get_pulse_from_spectrum(ft)
+        result.pulse = pulse
+
         FTL = pulse.fwhm(dt=pulse.dt / 100)
         logger.info(f"Fourier Transform Limit (FTL): {FTL * 1e15:.1f} fs")
 
@@ -636,47 +755,22 @@ class PypretResult:
             range_high=result.spec_scan_range[1] * 1e-9,
         )
 
-        # Clean scan by subtracting linear background for each stage position
         scan.subtract_background_for_all_positions()
 
-        # Defines the proper conversion from stage position
+        result.trace_raw = result.get_mesh_data()
         trace_raw = result.get_mesh_data()
-        scan_padding = 75  # (nm)
+
         if verbose:
             plot = result.get_mesh_data_plot(trace_raw)
             plot.show()
 
-        pnps = pypret.PNPS(
-            pulse,
-            method=method,
-            process=nlin_process,
-            material=material.pypret_material,
-        )
-        trace = preprocess(
-            trace_raw,
-            signal_range=(scan.wavelengths[0], scan.wavelengths[-1]),
-            dark_signal_range=(0, 10),
-        )
-        preprocess2(trace, pnps)
-        if verbose:
-            md = pypret.MeshDataPlot(trace, show=False)
-            ax = cast(plt.Axes, md.ax)
-            ax.set_title("Processed scan")
-            ax.set_xlabel("Frequency")
-            ax.set_xlim(
-                [
-                    2 * np.pi * 2.99792 * 1e17 / (spec_scan_range[1] - scan_padding),
-                    2 * np.pi * 2.99792 * 1e17 / (spec_scan_range[0] + scan_padding),
-                ]
-            )
-            md.show()
+        retriever = result._get_retriever(pulse)
 
-        # Pypret retrieval
-        ret = pypret.Retriever(pnps, "copra", verbose=True, maxiter=max_iter)
         pypret.random_gaussian(pulse, FTL, phase_max=0.1)
+
         # pypret.random_bigaussian(pulse, FTL, phase_max=0.1, sep)  # Experimental bimodal gaussian
-        ret.retrieve(trace, pulse.spectrum, weights=None)
-        result.retrieval = cast(RetrievalResultStandin, ret.result())
+        retriever.retrieve(result.trace, pulse.spectrum, weights=None)
+        result.retrieval = cast(RetrievalResultStandin, retriever.result())
 
         # Calculate the RMSE between retrieved and measured fundamental spectrum
         result_spec = pulse.spectral_intensity
@@ -690,73 +784,24 @@ class PypretResult:
         logger.info(f"RMS spectrum error: {rms_error}")
 
         # Find position of smallest FWHM
-        result_parameter = result.retrieval.parameter
-        result_parameter_mid_idx = np.floor(len(pulse.field) / 2) + 1
-        result_profile = np.zeros((len(pulse.field), len(result_parameter)))
-        fwhm = np.zeros((len(result_parameter), 1))
-        for i, p in enumerate(result_parameter):
-            pulse.spectrum = (
-                result.retrieval.pulse_retrieved * result.retrieval.pnps.mask(p)
-            )
-            profile = np.power(np.abs(pulse.field), 2)[:]
-            profile_max_idx = np.argmax(profile)
-            result_profile[:, i] = np.roll(
-                profile, -round(profile_max_idx - result_parameter_mid_idx)
-            )
-            try:
-                fwhm[i] = pulse.fwhm(dt=pulse.dt / 100)
-            except Exception:
-                fwhm[i] = np.nan
-        result_optimum_idx = np.nanargmin(fwhm)
-        result_optimum_fwhm = fwhm[result_optimum_idx]
+        result._calculate_fwhm_and_profile()
 
         # Plot FWHM vs grating position
         if verbose:
-            plt.close("all")
-            fig = plt.figure()
-            ax = cast(plt.Axes, fig.add_subplot(111))
-            fig = plt.plot(scan.positions * 1e3, fwhm * 1e15)
-            ax.tick_params(labelsize=12)
-            plt.xlabel("Position (mm)")
-            plt.ylabel("FWHM (fs)")
-            plt.title(
-                "Shortest: "
-                + str(np.round(result_optimum_fwhm[0] * 1e15, 1))
-                + " fs @ "
-                + str(np.round(scan.positions[result_optimum_idx] * 1e3, 3))
-                + "mm"
-            )
-            plt.ylim(
-                0,
-                min([np.nanmax(fwhm * 1e15), 4 * result_optimum_fwhm * 1e15]),
-            )
+            result.plot_fwhm_vs_grating_position()
             plt.show()
 
         # Plot temporal profile vs grating position
         if verbose:
-            plt.close("all")
-            fig = plt.figure()
-            ax = cast(plt.Axes, fig.add_subplot(111))
-            fig = plt.contourf(
-                pulse.t * 1e15,
-                scan.positions * 1e3,
-                result_profile.transpose(),
-                200,
-                cmap="nipy_spectral",
-            )
-            ax.tick_params(labelsize=12)
-            plt.xlabel("Time (fs)")
-            plt.ylabel("Position (mm)")
-            plt.title("Dscan Temporal Profile")
-            plt.xlim(-8 * result_optimum_fwhm * 1e15, 8 * result_optimum_fwhm * 1e15)
+            result.plot_temporal_profile_vs_grating_position()
             plt.show()
 
         # Plot results (Pypret style)
         if plot_position is None:
-            pypret_plot_parameter = result_parameter[result_optimum_idx]
-            final_position = scan.positions[result_optimum_idx]
+            pypret_plot_parameter = result.result_parameter[result.optimum_fwhm_idx]
+            final_position = scan.positions[result.optimum_fwhm_idx]
         else:
-            pypret_plot_parameter = result_parameter[
+            pypret_plot_parameter = result.result_parameter[
                 (np.nanargmin(np.abs(scan.positions - plot_position * 1e-3)))
             ]
             final_position = plot_position
