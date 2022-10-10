@@ -73,6 +73,9 @@ class RetrievalResultPlot:
     scan_range: Any
     final_position: Any
     scan_positions: Any
+    fourier_transform_limit: float
+    fundamental: Optional[np.ndarray] = None
+    fundamental_wavelength: Optional[np.ndarray] = None
 
     def plot(
         self,
@@ -83,9 +86,6 @@ class RetrievalResultPlot:
         phase_blanking: bool = False,
         phase_blanking_threshold=1e-3,
         show: bool = True,
-        fundamental: Optional[np.ndarray] = None,
-        fundamental_wavelength: Optional[np.ndarray] = None,
-        FTL=0,
     ):
         xaxis = PlotXAxis(xaxis)
         yaxis = PlotYAxis(yaxis)
@@ -161,17 +161,21 @@ class RetrievalResultPlot:
             w = pulse.w
             spectrum2 = self.retrieval_result.pulse_retrieved
         fund_w = (
-            pypret.frequencies.convert(fundamental_wavelength, "wl", "om") - pulse.w0
+            pypret.frequencies.convert(self.fundamental_wavelength, "wl", "om")
+            - pulse.w0
         )
         scale = np.abs(spectrum2).max()
         spectrum2 /= scale
-        if fundamental is not None:
+        if self.fundamental is None:
+            fundamental = None
+        else:
+            fundamental = np.copy(self.fundamental)
             scale_fund = np.abs(fundamental).max()
             fundamental /= scale_fund
 
         if xaxis == PlotXAxis.wavelength:
             w = pypret.frequencies.convert(w + pulse.w0, "om", "wl")
-            fund_w = fundamental_wavelength
+            fund_w = self.fundamental_wavelength
             unit = "m"
             label = "wavelength"
         elif xaxis == PlotXAxis.frequency:
@@ -206,7 +210,8 @@ class RetrievalResultPlot:
 
         fx = EngFormatter(unit=unit)
         ax2.xaxis.set_major_formatter(fx)
-        ax2.set_title("frequency domain (FTL = %.2f fs)" % (FTL * 1e15))
+        ftl = self.fourier_transform_limit * 1e15
+        ax2.set_title(f"frequency domain (FTL = {ftl:.2f} fs)")
         ax2.set_xlabel(label)
         ax2.set_ylabel(yaxis)
         ax22.set_ylabel("phase (rad)")

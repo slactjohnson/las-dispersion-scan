@@ -516,6 +516,11 @@ class ScanData:
         raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
 
 
+def _default_ndarray():
+    """Helper for optional ndarray values in dataclass fields."""
+    return np.zeros(0)
+
+
 @dataclasses.dataclass
 class PypretResult:
     fund: SpectrumData
@@ -538,9 +543,10 @@ class PypretResult:
     pulse: Optional[pypret.Pulse] = None
     trace_raw: Optional[pypret.MeshData] = None
     trace: Optional[pypret.MeshData] = None
-    fwhm: np.ndarray = None
-    result_profile: np.ndarray = None
-    result_parameter: np.ndarray = None
+    fwhm: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
+    result_profile: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
+    result_parameter: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
+    fourier_transform_limit: float = 0.0
 
     def get_fourier_transform(self) -> pypret.FourierTransform:
         # Create frequency-time grid
@@ -567,7 +573,7 @@ class PypretResult:
             units=["m", "m"],
         )
 
-    def get_mesh_data_plot(
+    def plot_mesh_data(
         self, data: Optional[pypret.MeshData] = None, scan_padding_nm: int = 75
     ) -> pypret.MeshDataPlot:
         if data is None:
@@ -675,6 +681,30 @@ class PypretResult:
         plt.xlim(-8 * self.optimum_fwhm * 1e15, 8 * self.optimum_fwhm * 1e15)
         return fig
 
+    @property
+    def fund_intensities_bkg_sub(self) -> np.ndarray:
+        assert self.pulse is not None
+        result_spec = scipy.interpolate.interp1d(
+            self.pulse.wl,
+            self.pulse.spectral_intensity,
+            bounds_error=False,
+            fill_value=0.0,
+        )(self.fund.wavelengths)
+
+        _, _, intensities = self.fund.subtract_background()
+        intensities *= pypret.lib.best_scale(intensities, result_spec)
+        return intensities
+
+    def get_rms_error(self) -> float:
+        assert self.pulse is not None
+        result_spec = scipy.interpolate.interp1d(
+            self.pulse.wl,
+            self.pulse.spectral_intensity,
+            bounds_error=False,
+            fill_value=0.0,
+        )(self.fund.wavelengths)
+        return pypret.lib.nrms(self.fund_intensities_bkg_sub, result_spec)
+
     def _get_retriever(
         self, pulse: pypret.Pulse
     ) -> pypret.retrieval.retriever.BaseRetriever:
@@ -694,6 +724,31 @@ class PypretResult:
 
         # Pypret retrieval
         return pypret.Retriever(pnps, "copra", verbose=True, maxiter=self.max_iter)
+
+    def _get_retrieval_plot(
+        self, plot_position: Optional[float] = None
+    ) -> RetrievalResultPlot:
+        # Plot results (Pypret style)
+        if plot_position is None:
+            plot_param = self.result_parameter[self.optimum_fwhm_idx]
+            final_position = self.scan.positions[self.optimum_fwhm_idx]
+        else:
+            plot_param = self.result_parameter[
+                (np.nanargmin(np.abs(self.scan.positions - plot_position * 1e-3)))
+            ]
+            final_position = plot_position
+
+        return RetrievalResultPlot(
+            retrieval_result=self.retrieval,
+            retrieval_parameter=plot_param,
+            fund_range=self.spec_fund_range,
+            scan_range=self.spec_scan_range,
+            final_position=final_position,
+            scan_positions=self.scan.positions,
+            fundamental=self.fund_intensities_bkg_sub,
+            fundamental_wavelength=self.fund.wavelengths,
+            fourier_transform_limit=self.fourier_transform_limit,
+        )
 
     @classmethod
     def from_data(
@@ -739,13 +794,13 @@ class PypretResult:
         ft = result.get_fourier_transform()
         logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
 
-        _, _, fund_intensities_bkg_sub = fund.subtract_background()
-
         pulse = fund.get_pulse_from_spectrum(ft)
         result.pulse = pulse
 
-        FTL = pulse.fwhm(dt=pulse.dt / 100)
-        logger.info(f"Fourier Transform Limit (FTL): {FTL * 1e15:.1f} fs")
+        result.fourier_transform_limit = pulse.fwhm(dt=pulse.dt / 100)
+        logger.info(
+            f"Fourier Transform Limit (FTL): {result.fourier_transform_limit * 1e15:.1f} fs"
+        )
 
         scan.intensities = gaussian_filter(scan.intensities, sigma=blur_sigma)
 
@@ -761,26 +816,18 @@ class PypretResult:
         trace_raw = result.get_mesh_data()
 
         if verbose:
-            plot = result.get_mesh_data_plot(trace_raw)
-            plot.show()
+            result.plot_mesh_data(trace_raw)
 
         retriever = result._get_retriever(pulse)
 
-        pypret.random_gaussian(pulse, FTL, phase_max=0.1)
+        pypret.random_gaussian(pulse, result.fourier_transform_limit, phase_max=0.1)
 
         # pypret.random_bigaussian(pulse, FTL, phase_max=0.1, sep)  # Experimental bimodal gaussian
         retriever.retrieve(result.trace, pulse.spectrum, weights=None)
         result.retrieval = cast(RetrievalResultStandin, retriever.result())
 
         # Calculate the RMSE between retrieved and measured fundamental spectrum
-        result_spec = pulse.spectral_intensity
-        result_spec = scipy.interpolate.interp1d(
-            pulse.wl, result_spec, bounds_error=False, fill_value=0.0
-        )(fund.wavelengths)
-        fund_intensities_bkg_sub *= pypret.lib.best_scale(
-            fund_intensities_bkg_sub, result_spec
-        )
-        rms_error = pypret.lib.nrms(fund_intensities_bkg_sub, result_spec)
+        rms_error = result.get_rms_error()
         logger.info(f"RMS spectrum error: {rms_error}")
 
         # Find position of smallest FWHM
@@ -789,40 +836,22 @@ class PypretResult:
         # Plot FWHM vs grating position
         if verbose:
             result.plot_fwhm_vs_grating_position()
-            plt.show()
 
         # Plot temporal profile vs grating position
         if verbose:
             result.plot_temporal_profile_vs_grating_position()
+
+        result.plot = result._get_retrieval_plot(result.plot_position)
+
+        if verbose:
+            result.plot.plot(
+                oversampling=8,
+                phase_blanking=True,
+                phase_blanking_threshold=0.01,
+                limit=True,
+            )
             plt.show()
 
-        # Plot results (Pypret style)
-        if plot_position is None:
-            pypret_plot_parameter = result.result_parameter[result.optimum_fwhm_idx]
-            final_position = scan.positions[result.optimum_fwhm_idx]
-        else:
-            pypret_plot_parameter = result.result_parameter[
-                (np.nanargmin(np.abs(scan.positions - plot_position * 1e-3)))
-            ]
-            final_position = plot_position
-
-        result.plot = RetrievalResultPlot(
-            result.retrieval,
-            pypret_plot_parameter,
-            spec_fund_range,
-            spec_scan_range,
-            final_position,
-            scan.positions,
-        )
-        result.plot.plot(
-            fundamental=fund_intensities_bkg_sub,
-            fundamental_wavelength=fund.wavelengths,
-            oversampling=8,
-            phase_blanking=True,
-            phase_blanking_threshold=0.01,
-            limit=True,
-            FTL=FTL,
-        )
         return result
 
 
