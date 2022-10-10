@@ -1,3 +1,4 @@
+import enum
 import os
 import sys
 from time import sleep
@@ -13,6 +14,50 @@ from .plotting import RetrievalResultPlot
 from typing import Optional, Tuple
 
 
+class PulseAnalysisMethod(str, enum.Enum):
+    frog = "frog"
+    tdp = "tdp"
+    dscan = "dscan"
+    miips = "miips"
+    ifrog = "ifrog"
+
+
+class NonlinearProcess(str, enum.Enum):
+    shg = "shg"
+    xpw = "xpw"
+    thg = "thg"
+    sd = "sd"
+    pg = "pg"
+
+
+class Material(str, enum.Enum):
+    fs = "FS"
+    bk7 = "BK7"
+    gratinga = "gratinga"
+    gratingc = "gratingc"
+
+    def get_coefficient(self, wedge_angle: float) -> float:
+        if self in {Material.gratinga, Material.gratingc}:
+            return 4.
+
+        if self in {Material.bk7, Material.fs}:
+            return np.tan(wedge_angle * np.pi / 180) * np.cos(
+                wedge_angle * np.pi / 360
+            )
+
+        raise ValueError("Unsupported material type")
+
+    @property
+    def pypret_material(self) -> pypret.material.BaseMaterial:
+        """The pypret material."""
+        return {
+            Material.fs: pypret.material.FS,
+            Material.bk7: pypret.material.BK7,
+            Material.gratinga: pypret.material.gratinga,
+            Material.gratingc: pypret.material.gratingc,
+        }[self]
+    
+
 def run_general_scan():
     ### OPTIONS AND PARAMETERS ###
 
@@ -20,11 +65,11 @@ def run_general_scan():
     # Set wavelength (optional)
     wavelength_fund = 490  # 800 490
     # Select method of analyzing pulse
-    method_pick = "dscan"  # 'frog', 'tdp', 'dscan', 'miips', 'ifrog
+    method_pick = PulseAnalysisMethod.dscan
     # Select nonlinear process
-    nlin_process = "shg"  # 'shg' 'xpw', 'thg', 'sd', 'pg'
+    nlin_process = NonlinearProcess.shg
     # Select the material (for the d-scan)
-    material_pick = "BK7"  # 'FS', 'BK7', 'gratinga', 'gratingc'
+    material_pick = Material.bk7
 
     # Collect fundamental?
     take_fund = False
@@ -185,9 +230,9 @@ class PrototypeScan:
     def __init__(
         self,
         wavelength_fund: int,
-        method_pick: str,
-        nlin_process: str,
-        material_pick: str,
+        method_pick: PulseAnalysisMethod,
+        nlin_process: NonlinearProcess,
+        material_pick: Material,
         take_fund: bool,
         auto_fund: bool,
         take_scan: bool,
@@ -499,11 +544,7 @@ class PrototypeScan:
                 np.multiply(fund_wavelength, fund_intensities)
             ) / sum(fund_intensities)
             # wavelength_raw_center = self.wavelength_fund * 1E-9
-            print(
-                "Fundamental center wavelength: "
-                + str(round(wavelength_raw_center * 1e9, 1))
-                + " nm"
-            )
+            print(f"Fundamental center wavelength: {wavelength_raw_center * 1e9:.1f} nm")
 
             # Create frequency-time grid
             freq_bandwidth = (
@@ -520,7 +561,7 @@ class PrototypeScan:
             ft = pypret.FourierTransform(
                 self.pypret_grid_points, dw=fund_frequency_step, w0=-freq_bandwidth / 2
             )
-            print("Time step =  " + str(np.round(ft.dt * 1e15, 2)) + " fs")
+            print(f"Time step = {ft.dt * 1e15:.2f} fs")
             pulse = pypret.Pulse(ft, wavelength_raw_center)
 
             # Subtract background
@@ -541,7 +582,7 @@ class PrototypeScan:
                 fund_wavelength, fund_intensities_bkg_sub, pulse=pulse
             )
             FTL = pulse.fwhm(dt=pulse.dt / 100)
-            print("Fourier Transform Limit (FTL):", np.round(FTL * 1e15, 1), " fs")
+            print(f"Fourier Transform Limit (FTL): {FTL * 1e15:.1f} fs")
 
             # Plot fundamental
             if self.verbose_pypret:
@@ -562,11 +603,7 @@ class PrototypeScan:
                 plt.legend()
                 plt.xlabel("Wavelength (nm)")
                 plt.ylabel("Counts (arb.)")
-                plt.title(
-                    "Fundamental Spectrum (FTL = "
-                    + str(np.round(FTL * 1e15, 1))
-                    + " fs)"
-                )
+                plt.title(f"Fundamental Spectrum (FTL) = {FTL * 1e15:.1f} fs")
                 plt.show()
 
             # Load scan
@@ -598,14 +635,7 @@ class PrototypeScan:
                 scan_intensities[i, :] -= scan_wavelength * p[0] + p[1]
 
             # Defines the proper conversion from stage position
-            if self.material_pick in {"gratinga", "gratingc"}:
-                method_coef = 4
-            elif self.material_pick in {"BK7", "FS"}:
-                method_coef = np.tan(self.wedge_angle * np.pi / 180) * np.cos(
-                    self.wedge_angle * np.pi / 360
-                )
-            else:
-                raise ValueError(f"Unsupported material choice: {self.material_pick}")
+            method_coef = self.material_pick.get_coefficient()
 
             trace_raw = pypret.MeshData(
                 scan_intensities,
@@ -641,7 +671,7 @@ class PrototypeScan:
                 pulse,
                 method=self.method_pick,
                 process=self.nlin_process,
-                material=getattr("pypret.material", self.material_pick),
+                material=Material(self.material_pick).pypret,
             )
             trace = preprocess(
                 trace_raw,

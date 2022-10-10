@@ -1,3 +1,5 @@
+from typing import Optional, Tuple
+
 import numpy as np
 import pypret
 import pypret.frequencies
@@ -20,7 +22,11 @@ def pulse_from_spectrum(wavelength, spectrum, pulse):
     return pulse
 
 
-def preprocess(trace, signal_range=None, dark_signal_range=None):
+def preprocess(
+    trace: pypret.MeshData,
+    signal_range: Optional[Tuple[float, float]] = None,
+    dark_signal_range: Optional[Tuple[float, float]] = None,
+):
     dark_signal = None
     if dark_signal_range is not None:
         dark_signal = trace.copy()
@@ -36,7 +42,10 @@ def preprocess(trace, signal_range=None, dark_signal_range=None):
     return trace
 
 
-def preprocess2(trace, pnps):
+def preprocess2(
+    trace: pypret.MeshData,
+    pnps: pypret.pnps.BasePNPS,
+):
     if trace.units[1] == "m":
         # scaled in wavelength -> has to be corrected
         wavelength = trace.axes[1]
