@@ -1,6 +1,6 @@
 import dataclasses
 import enum
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -84,7 +84,7 @@ class RetrievalResultPlot:
         phase_blanking_threshold=1e-3,
         show: bool = True,
         fundamental: Optional[np.ndarray] = None,
-        fundamental_wavelength: Optional[float] = None,
+        fundamental_wavelength: Optional[np.ndarray] = None,
         FTL=0,
     ):
         xaxis = PlotXAxis(xaxis)
@@ -99,13 +99,13 @@ class RetrievalResultPlot:
         fig = plt.figure(figsize=(42.0 / 2.54, 20.0 / 2.54))
         gs1 = gridspec.GridSpec(2, 2)
         gs2 = gridspec.GridSpec(2, 6)
-        ax1 = plt.subplot(gs1[0, 0])
-        ax2 = plt.subplot(gs1[0, 1])
-        ax3 = plt.subplot(gs2[1, :2])
-        ax4 = plt.subplot(gs2[1, 2:4])
-        ax5 = plt.subplot(gs2[1, 4:])
-        ax12 = ax1.twinx()
-        ax22 = ax2.twinx()
+        ax1 = cast(plt.Axes, plt.subplot(gs1[0, 0]))
+        ax2 = cast(plt.Axes, plt.subplot(gs1[0, 1]))
+        ax3 = cast(plt.Axes, plt.subplot(gs2[1, :2]))
+        ax4 = cast(plt.Axes, plt.subplot(gs2[1, 2:4]))
+        ax5 = cast(plt.Axes, plt.subplot(gs2[1, 4:]))
+        ax12 = cast(plt.Axes, ax1.twinx())
+        ax22 = cast(plt.Axes, ax2.twinx())
 
         # Plot in time domain
         pulse.spectrum = (

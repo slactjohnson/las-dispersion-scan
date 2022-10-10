@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import enum
 import logging
 import os
-import time
-from typing import Optional, Tuple
+from types import SimpleNamespace
+from typing import Any, Optional, Tuple, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pypret
-import scipy
+import scipy.interpolate
 from scipy.ndimage import gaussian_filter
 
 from .plotting import RetrievalResultPlot
@@ -62,6 +63,42 @@ class Material(str, enum.Enum):
             Material.gratinga: pypret.material.gratinga,
             Material.gratingc: pypret.material.gratingc,
         }[self]
+
+
+class RetrievalResultStandin(SimpleNamespace):
+    parameter: Any
+    options: Any
+    logging: Any
+    measurement: Any
+    pnps: Optional[pypret.pnps.BasePNPS]
+    # the pulse spectra
+    # 1 - the retrieved pulse
+    pulse_retrieved: Any
+    # 2 - the original test pulse, optional
+    pulse_original: Any
+    # 3 - the initial guess
+    pulse_initial: Any
+
+    # the measurement traces
+    # 1 - the original data used for retrieval
+    trace_input: Any
+    # 2 - the trace error and the trace calculated from the retrieved pulse
+    trace_error: Any
+    trace_retrieved: Any
+    response_function: Any
+    # the weights
+    weights: np.ndarray
+
+    # this is set if the original spectrum is provided
+    # the trace error of the test pulse (non-zero for noisy input)
+    trace_error_optimal: float
+    # 3 - the optimal trace calculated from the test pulse
+    trace_original: float
+    pulse_error: float
+    # the logged trace errors
+    trace_errors: np.ndarray
+    # the running minimum of the trace errors (for plotting)
+    rm_trace_errors: np.ndarray
 
 
 def get_fundamental_spectrum(
@@ -174,84 +211,6 @@ def get_fundamental_spectrum(
 #     final_stage_move = False
 
 
-@dataclasses.dataclass
-class PrototypeScan:
-    wavelength_fund: int
-    method_pick: PulseAnalysisMethod
-    nlin_process: NonlinearProcess
-    material_pick: Material
-    take_fund: bool
-    auto_fund: bool
-    take_scan: bool
-    update_txt: bool
-    final_stage_move: bool
-    wedge_angle: int
-    preview: bool = True
-    spec_time_fund: int = 20_000
-    spec_avgs_fund: int = 30
-    spec_time_scan: int = 250_000
-    spec_avgs_scan: int = 4
-    spec_fund_range: Tuple[int, int] = (400, 600)
-    spec_scan_range: Tuple[int, int] = (200, 300)
-    scan_pos_center: float = 0.1
-    scan_points: int = 100
-    scan_amplitude_negative: float = 0.5
-    scan_amplitude_positive: float = 0.5
-    ESP_COM_port: str = "COM1"
-    ESP_axis_stage_grating: int = 1
-    auto_fund_home: bool = False
-    auto_fund_ID: int = 27_250_600
-    auto_fund_pos_standby: int = 0
-    auto_fund_pos_fund: float = 13.3
-    auto_fund_pos_scan: float = 0.5
-    pypret_blur_sigma: int = 0
-    pypret_grid_points: int = 3000
-    pypret_grid_bandwidth_wl: int = 950
-    pypret_max_iter: int = 30
-    pypret_plot_position: Optional[float] = None
-
-    def run(self):
-        # Collect fundamental
-        motor = None  # TODO
-        if self.take_fund:
-            if self.auto_fund:
-                try:
-                    motor.move_to(self.auto_fund_pos_fund, True)
-                except Exception:
-                    motor.move_to(self.auto_fund_pos_fund, False)
-                    time.sleep(15)
-            # self.spec_fund = oo.spectrum(
-            #     specs.devices,
-            #     integration_time=self.spec_time_fund,
-            #     averages=self.spec_avgs_fund,
-            # )
-            if self.preview:
-                logger.info("Check fundamental spectrum. Close window to continue.")
-                self.spec_fund.plot_live(wavelength_limits=self.spec_fund_range)
-                logger.info("Continuing...")
-            self.spec_fund.collect_intensities()
-            fundamental_spectrum = get_fundamental_spectrum(
-                self.spec_fund.wavelengths,
-                self.spec_fund.intensities,
-                range_low=self.spec_fund_range[0],
-                range_high=self.spec_fund_range[1],
-            )
-            if not os.path.exists(os.path.dirname(self.path_full_fund)):
-                os.makedirs(os.path.dirname(self.path_full_fund))
-            np.savetxt(self.path_full_fund, fundamental_spectrum)
-
-        if self.take_scan:
-            self.acquire_data()
-
-        if self.update_txt:
-            # self.load_old_text_format()
-            ...
-
-        run_pypret(
-            fund_data=...,
-        )
-
-
 def load_old_text_format(path: str) -> Tuple[np.ndarray, np.ndarray]:
     """
     Load fundamental spectrum and scan spectra from the "old" (original?)
@@ -284,6 +243,33 @@ def load_old_text_format(path: str) -> Tuple[np.ndarray, np.ndarray]:
 class SpectrumData:
     wavelengths: np.ndarray
     intensities: np.ndarray
+
+    def get_pulse_from_spectrum(self, ft: pypret.FourierTransform) -> pypret.Pulse:
+        _, _, fund_intensities_bkg_sub = self.subtract_background()
+        return pulse_from_spectrum(
+            self.wavelengths,
+            fund_intensities_bkg_sub,
+            pulse=pypret.Pulse(ft, self.raw_center),
+        )
+
+    def get_fourier_transform_limit(self, ft: pypret.FourierTransform) -> float:
+        pulse = self.get_pulse_from_spectrum(ft)
+        return pulse.fwhm(dt=pulse.dt / 100)
+
+    @property
+    def raw_center(self) -> float:
+        """Wavelength raw center."""
+        return sum(np.multiply(self.wavelengths, self.intensities)) / sum(
+            self.intensities
+        )
+        # wavelength_raw_center = self.wavelength_fund * 1E-9
+
+    def truncate_wavelength(
+        self, range_low: float, range_high: float
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Truncating wavelength given the provided range."""
+        idx = (self.wavelengths > range_low) & (self.wavelengths < range_high)
+        return self.wavelengths[idx], self.intensities[idx]
 
     @classmethod
     def from_txt_file(cls, filename: str) -> SpectrumData:
@@ -371,6 +357,56 @@ class SpectrumData:
         # intensities *= wavelengths * wavelengths
         return cls(wavelengths, intensities)
 
+    def get_background(self, *, count: int = 15) -> Tuple[np.ndarray, np.ndarray]:
+        wavelength_bkg = np.hstack(
+            (self.wavelengths[:count], self.wavelengths[-count:])
+        )
+        intensities_bkg = np.hstack(
+            (self.intensities[:count], self.intensities[-count:])
+        )
+        return wavelength_bkg, intensities_bkg
+
+    def subtract_background(self, *, count: int = 15):
+        wavelength_bkg, intensities_bkg = self.get_background(count=count)
+        fit = np.polyfit(wavelength_bkg, intensities_bkg, 1)
+        intensities_bkg_fit = self.wavelengths * fit[0] + fit[1]
+        intensities_bkg_sub = self.intensities - intensities_bkg_fit
+        intensities_bkg_sub /= np.max(intensities_bkg_sub)
+        intensities_bkg_sub[intensities_bkg_sub < 0.0025] = 0
+        return (
+            fit,
+            intensities_bkg_fit,
+            intensities_bkg_sub,
+        )
+
+    def plot(self, pulse: Optional[pypret.Pulse] = None):
+        fig, ax = plt.subplots()
+        wavelength_bkg, intensities_bkg = self.get_background(count=15)
+        _, intensities_bkg_fit, _ = self.subtract_background()
+
+        plt.plot(self.wavelengths * 1e9, self.intensities, "k", label="All data")
+        plt.plot(
+            wavelength_bkg * 1e9,
+            intensities_bkg,
+            "xb",
+            label="Points for fit",
+        )
+        plt.plot(
+            self.wavelengths * 1e9,
+            intensities_bkg_fit,
+            "r",
+            label="Background fit",
+        )
+        plt.legend()
+        plt.xlabel("Wavelength (nm)")
+        plt.ylabel("Counts (arb.)")
+
+        if pulse is not None:
+            ftl = pulse.fwhm(dt=pulse.dt / 100)
+            plt.title(f"Fundamental Spectrum (FTL) = {ftl * 1e15:.1f} fs")
+
+        return fig, ax
+
 
 @dataclasses.dataclass
 class ScanData:
@@ -380,6 +416,27 @@ class ScanData:
     wavelengths: np.ndarray
     #: Normalized intensities
     intensities: np.ndarray
+
+    def subtract_background_for_all_positions(self) -> None:
+        """
+        Clean scan by subtracting linear background for each stage position.
+
+        Works in-place.
+        """
+        scan_wavelength_bkg = np.hstack((self.wavelengths[:15], self.wavelengths[-15:]))
+        for i in range(len(self.positions)):
+            scan_intensities_bkg = np.hstack(
+                (self.intensities[i, :15], self.intensities[i, -15:])
+            )
+            p = np.polyfit(scan_wavelength_bkg, scan_intensities_bkg, 1)
+            self.intensities[i, :] -= self.wavelengths * p[0] + p[1]
+
+    def truncate_wavelength(
+        self, range_low: float, range_high: float
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Truncating wavelength given the provided range."""
+        idx = (self.wavelengths > range_low) & (self.wavelengths < range_high)
+        return self.wavelengths[idx], self.intensities[:, idx]
 
     @classmethod
     def from_txt_file(cls, filename: str) -> ScanData:
@@ -459,315 +516,336 @@ class ScanData:
         raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
 
 
-def run_pypret(
-    fund: SpectrumData,
-    scan: ScanData,
-    material: Material,
-    method: PulseAnalysisMethod,
-    nlin_process: NonlinearProcess,
-    verbose: bool = True,
-    wedge_angle: float = 8.0,
-    blur_sigma: int = 0,
-    grid_points: int = 3000,
-    freq_bandwidth_wl: int = 950,
-    max_iter: int = 30,
-    plot_position: Optional[float] = None,
-    spec_fund_range: Tuple[float, float] = (400, 600),
-    spec_scan_range: Tuple[float, float] = (200, 300),
-):
-    # Clean fundamental by truncating wavelength
-    fund_wavelength_idx = (fund.wavelengths > spec_fund_range[0] * 1e-9) & (
-        fund.wavelengths < spec_fund_range[1] * 1e-9
+@dataclasses.dataclass
+class PypretResult:
+    fund: SpectrumData
+    scan: ScanData
+    material: Material
+    method: PulseAnalysisMethod
+    nlin_process: NonlinearProcess
+    wedge_angle: float = 8.0
+    blur_sigma: int = 0
+    grid_points: int = 3000
+    freq_bandwidth_wl: int = 950
+    max_iter: int = 30
+    plot_position: Optional[float] = None
+    spec_fund_range: Tuple[float, float] = (400, 600)
+    spec_scan_range: Tuple[float, float] = (200, 300)
+    plot: Optional[RetrievalResultPlot] = None
+    retrieval: RetrievalResultStandin = dataclasses.field(
+        default_factory=RetrievalResultStandin
     )
-    fund.wavelengths = fund.wavelengths[fund_wavelength_idx]
-    fund.intensities = fund.intensities[fund_wavelength_idx]
-    wavelength_raw_center = sum(np.multiply(fund.wavelengths, fund.intensities)) / sum(
-        fund.intensities
-    )
-    # wavelength_raw_center = self.wavelength_fund * 1E-9
-    logger.info(f"Fundamental center wavelength: {wavelength_raw_center * 1e9:.1f} nm")
 
-    # Create frequency-time grid
-    freq_bandwidth = (
-        freq_bandwidth_wl * 1e-9 * 2 * np.pi * 2.998e8 / wavelength_raw_center**2
-    )
-    fund_frequency_step = np.round(freq_bandwidth / (grid_points - 1), 0)
-    ft = pypret.FourierTransform(
-        grid_points, dw=fund_frequency_step, w0=-freq_bandwidth / 2
-    )
-    logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
-    pulse = pypret.Pulse(ft, wavelength_raw_center)
-
-    # Subtract background
-    fund_wavelength_bkg = np.hstack((fund.wavelengths[:15], fund.wavelengths[-15:]))
-    fund_intensities_bkg = np.hstack((fund.intensities[:15], fund.intensities[-15:]))
-    p = np.polyfit(fund_wavelength_bkg, fund_intensities_bkg, 1)
-    fund_intensities_bkg_fit = fund.wavelengths * p[0] + p[1]
-    fund_intensities_bkg_sub = fund.intensities - fund_intensities_bkg_fit
-    fund_intensities_bkg_sub /= np.max(fund_intensities_bkg_sub)
-    fund_intensities_bkg_sub[fund_intensities_bkg_sub < 0.0025] = 0
-
-    # Fourier limit
-    pulse = pulse_from_spectrum(fund.wavelengths, fund_intensities_bkg_sub, pulse=pulse)
-    FTL = pulse.fwhm(dt=pulse.dt / 100)
-    logger.info(f"Fourier Transform Limit (FTL): {FTL * 1e15:.1f} fs")
-
-    # Plot fundamental
-    if verbose:
-        fig, ax = plt.subplots()
-        plt.plot(fund.wavelengths * 1e9, fund.intensities, "k", label="All data")
-        plt.plot(
-            fund_wavelength_bkg * 1e9,
-            fund_intensities_bkg,
-            "xb",
-            label="Points for fit",
+    def get_fourier_transform(self) -> pypret.FourierTransform:
+        # Create frequency-time grid
+        freq_bandwidth = (
+            self.freq_bandwidth_wl
+            * 1e-9
+            * 2
+            * np.pi
+            * 2.998e8
+            / self.fund.raw_center**2
         )
-        plt.plot(
-            fund.wavelengths * 1e9,
-            fund_intensities_bkg_fit,
-            "r",
-            label="Background fit",
+        fund_frequency_step = np.round(freq_bandwidth / (self.grid_points - 1), 0)
+        return pypret.FourierTransform(
+            self.grid_points, dw=fund_frequency_step, w0=-freq_bandwidth / 2
         )
-        plt.legend()
-        plt.xlabel("Wavelength (nm)")
-        plt.ylabel("Counts (arb.)")
-        plt.title(f"Fundamental Spectrum (FTL) = {FTL * 1e15:.1f} fs")
-        plt.show()
 
-    scan.intensities = gaussian_filter(scan.intensities, sigma=blur_sigma)
-
-    # Clean scan by truncating wavelength
-    scan_wavelength_idx = (scan.wavelengths > spec_scan_range[0] * 1e-9) & (
-        scan.wavelengths < spec_scan_range[1] * 1e-9
-    )
-    scan.wavelengths = scan.wavelengths[scan_wavelength_idx]
-    scan.intensities = scan.intensities[:, scan_wavelength_idx]
-
-    # Clean scan by subtracting linear background for each stage position
-    scan_wavelength_bkg = np.hstack((scan.wavelengths[:15], scan.wavelengths[-15:]))
-    for i in range(len(scan.positions)):
-        scan_intensities_bkg = np.hstack(
-            (scan.intensities[i, :15], scan.intensities[i, -15:])
+    def get_mesh_data(self) -> pypret.MeshData:
+        coef = self.material.get_coefficient(self.wedge_angle)
+        return pypret.MeshData(
+            self.scan.intensities,
+            coef * (self.scan.positions - min(self.scan.positions)),
+            self.scan.wavelengths,
+            labels=["Insertion", "Wavelength"],
+            units=["m", "m"],
         )
-        p = np.polyfit(scan_wavelength_bkg, scan_intensities_bkg, 1)
-        scan.intensities[i, :] -= scan.wavelengths * p[0] + p[1]
 
-    # Defines the proper conversion from stage position
-    method_coef = material.get_coefficient(wedge_angle)
+    def get_mesh_data_plot(
+        self, data: Optional[pypret.MeshData] = None, scan_padding_nm=75
+    ) -> pypret.MeshDataPlot:
+        if data is None:
+            data = self.get_mesh_data()
 
-    trace_raw = pypret.MeshData(
-        scan.intensities,
-        method_coef * (scan.positions - min(scan.positions)),
-        scan.wavelengths,
-        labels=["Insertion", "Wavelength"],
-        units=["m", "m"],
-    )
-    scan_padding = 75  # (nm)
-    if verbose:
-        md = pypret.MeshDataPlot(trace_raw, show=False)
-        md.ax.set_title("Cropped scan")
-        md.ax.set_xlim(
+        md = pypret.MeshDataPlot(data, show=False)
+        ax = cast(plt.Axes, md.ax)
+        ax.set_title("Cropped scan")
+        ax.set_xlim(
             [
-                (spec_scan_range[0] + scan_padding) * 1e-9,
-                (spec_scan_range[1] - scan_padding) * 1e-9,
+                (self.spec_scan_range[0] + scan_padding_nm) * 1e-9,
+                (self.spec_scan_range[1] - scan_padding_nm) * 1e-9,
             ]
         )
-        md.show()
+        return md
 
-    pnps = pypret.PNPS(
-        pulse,
-        method=method,
-        process=nlin_process,
-        material=material.pypret_material,
-    )
-    trace = preprocess(
-        trace_raw,
-        signal_range=(scan.wavelengths[0], scan.wavelengths[-1]),
-        dark_signal_range=(0, 10),
-    )
-    preprocess2(trace, pnps)
-    if verbose:
-        md = pypret.MeshDataPlot(trace, show=False)
-        md.ax.set_title("Processed scan")
-        md.ax.set_xlabel("Frequency")
-        md.ax.set_xlim(
-            [
-                2 * np.pi * 2.99792 * 1e17 / (spec_scan_range[1] - scan_padding),
-                2 * np.pi * 2.99792 * 1e17 / (spec_scan_range[0] + scan_padding),
+    @classmethod
+    def from_data(
+        cls,
+        fund: SpectrumData,
+        scan: ScanData,
+        material: Material,
+        method: PulseAnalysisMethod,
+        nlin_process: NonlinearProcess,
+        verbose: bool = True,
+        wedge_angle: float = 8.0,
+        blur_sigma: int = 0,
+        grid_points: int = 3000,
+        freq_bandwidth_wl: int = 950,
+        max_iter: int = 30,
+        plot_position: Optional[float] = None,
+        spec_fund_range: Tuple[float, float] = (400, 600),
+        spec_scan_range: Tuple[float, float] = (200, 300),
+    ) -> PypretResult:
+        fund = copy.deepcopy(fund)
+        scan = copy.deepcopy(scan)
+        result = PypretResult(
+            fund=fund,
+            scan=scan,
+            material=material,
+            method=method,
+            nlin_process=nlin_process,
+            wedge_angle=wedge_angle,
+            blur_sigma=blur_sigma,
+            grid_points=grid_points,
+            freq_bandwidth_wl=freq_bandwidth_wl,
+            max_iter=max_iter,
+            plot_position=plot_position,
+            spec_fund_range=spec_fund_range,
+            spec_scan_range=spec_scan_range,
+        )
+        fund.wavelengths, fund.intensities = fund.truncate_wavelength(
+            range_low=result.spec_fund_range[0] * 1e-9,
+            range_high=result.spec_fund_range[1] * 1e-9,
+        )
+        logger.info(f"Fundamental center wavelength: {fund.raw_center * 1e9:.1f} nm")
+
+        ft = result.get_fourier_transform()
+        logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
+
+        _, _, fund_intensities_bkg_sub = fund.subtract_background()
+
+        pulse = fund.get_pulse_from_spectrum(ft)
+        FTL = pulse.fwhm(dt=pulse.dt / 100)
+        logger.info(f"Fourier Transform Limit (FTL): {FTL * 1e15:.1f} fs")
+
+        scan.intensities = gaussian_filter(scan.intensities, sigma=blur_sigma)
+
+        # Clean scan by truncating wavelength
+        scan.wavelengths, scan.intensities = scan.truncate_wavelength(
+            range_low=result.spec_scan_range[0] * 1e-9,
+            range_high=result.spec_scan_range[1] * 1e-9,
+        )
+
+        # Clean scan by subtracting linear background for each stage position
+        scan.subtract_background_for_all_positions()
+
+        # Defines the proper conversion from stage position
+        trace_raw = result.get_mesh_data()
+        scan_padding = 75  # (nm)
+        if verbose:
+            plot = result.get_mesh_data_plot(trace_raw)
+            plot.show()
+
+        pnps = pypret.PNPS(
+            pulse,
+            method=method,
+            process=nlin_process,
+            material=material.pypret_material,
+        )
+        trace = preprocess(
+            trace_raw,
+            signal_range=(scan.wavelengths[0], scan.wavelengths[-1]),
+            dark_signal_range=(0, 10),
+        )
+        preprocess2(trace, pnps)
+        if verbose:
+            md = pypret.MeshDataPlot(trace, show=False)
+            ax = cast(plt.Axes, md.ax)
+            ax.set_title("Processed scan")
+            ax.set_xlabel("Frequency")
+            ax.set_xlim(
+                [
+                    2 * np.pi * 2.99792 * 1e17 / (spec_scan_range[1] - scan_padding),
+                    2 * np.pi * 2.99792 * 1e17 / (spec_scan_range[0] + scan_padding),
+                ]
+            )
+            md.show()
+
+        # Pypret retrieval
+        ret = pypret.Retriever(pnps, "copra", verbose=True, maxiter=max_iter)
+        pypret.random_gaussian(pulse, FTL, phase_max=0.1)
+        # pypret.random_bigaussian(pulse, FTL, phase_max=0.1, sep)  # Experimental bimodal gaussian
+        ret.retrieve(trace, pulse.spectrum, weights=None)
+        result.retrieval = cast(RetrievalResultStandin, ret.result())
+
+        # Calculate the RMSE between retrieved and measured fundamental spectrum
+        result_spec = pulse.spectral_intensity
+        result_spec = scipy.interpolate.interp1d(
+            pulse.wl, result_spec, bounds_error=False, fill_value=0.0
+        )(fund.wavelengths)
+        fund_intensities_bkg_sub *= pypret.lib.best_scale(
+            fund_intensities_bkg_sub, result_spec
+        )
+        rms_error = pypret.lib.nrms(fund_intensities_bkg_sub, result_spec)
+        logger.info(f"RMS spectrum error: {rms_error}")
+
+        # Find position of smallest FWHM
+        result_parameter = result.retrieval.parameter
+        result_parameter_mid_idx = np.floor(len(pulse.field) / 2) + 1
+        result_profile = np.zeros((len(pulse.field), len(result_parameter)))
+        fwhm = np.zeros((len(result_parameter), 1))
+        for i, p in enumerate(result_parameter):
+            pulse.spectrum = (
+                result.retrieval.pulse_retrieved * result.retrieval.pnps.mask(p)
+            )
+            profile = np.power(np.abs(pulse.field), 2)[:]
+            profile_max_idx = np.argmax(profile)
+            result_profile[:, i] = np.roll(
+                profile, -round(profile_max_idx - result_parameter_mid_idx)
+            )
+            try:
+                fwhm[i] = pulse.fwhm(dt=pulse.dt / 100)
+            except Exception:
+                fwhm[i] = np.nan
+        result_optimum_idx = np.nanargmin(fwhm)
+        result_optimum_fwhm = fwhm[result_optimum_idx]
+
+        # Plot FWHM vs grating position
+        if verbose:
+            plt.close("all")
+            fig = plt.figure()
+            ax = cast(plt.Axes, fig.add_subplot(111))
+            fig = plt.plot(scan.positions * 1e3, fwhm * 1e15)
+            ax.tick_params(labelsize=12)
+            plt.xlabel("Position (mm)")
+            plt.ylabel("FWHM (fs)")
+            plt.title(
+                "Shortest: "
+                + str(np.round(result_optimum_fwhm[0] * 1e15, 1))
+                + " fs @ "
+                + str(np.round(scan.positions[result_optimum_idx] * 1e3, 3))
+                + "mm"
+            )
+            plt.ylim(
+                0,
+                min([np.nanmax(fwhm * 1e15), 4 * result_optimum_fwhm * 1e15]),
+            )
+            plt.show()
+
+        # Plot temporal profile vs grating position
+        if verbose:
+            plt.close("all")
+            fig = plt.figure()
+            ax = cast(plt.Axes, fig.add_subplot(111))
+            fig = plt.contourf(
+                pulse.t * 1e15,
+                scan.positions * 1e3,
+                result_profile.transpose(),
+                200,
+                cmap="nipy_spectral",
+            )
+            ax.tick_params(labelsize=12)
+            plt.xlabel("Time (fs)")
+            plt.ylabel("Position (mm)")
+            plt.title("Dscan Temporal Profile")
+            plt.xlim(-8 * result_optimum_fwhm * 1e15, 8 * result_optimum_fwhm * 1e15)
+            plt.show()
+
+        # Plot results (Pypret style)
+        if plot_position is None:
+            pypret_plot_parameter = result_parameter[result_optimum_idx]
+            final_position = scan.positions[result_optimum_idx]
+        else:
+            pypret_plot_parameter = result_parameter[
+                (np.nanargmin(np.abs(scan.positions - plot_position * 1e-3)))
             ]
+            final_position = plot_position
+
+        result.plot = RetrievalResultPlot(
+            result.retrieval,
+            pypret_plot_parameter,
+            spec_fund_range,
+            spec_scan_range,
+            final_position,
+            scan.positions,
         )
-        md.show()
-
-    # Pypret retrieval
-    ret = pypret.Retriever(pnps, "copra", verbose=True, maxiter=max_iter)
-    pypret.random_gaussian(pulse, FTL, phase_max=0.1)
-    # pypret.random_bigaussian(pulse, FTL, phase_max=0.1, sep)  # Experimental bimodal gaussian
-    ret.retrieve(trace, pulse.spectrum, weights=None)
-    result = ret.result()
-    # Calculate the RMSE between retrieved and measured fundamental spectrum
-    result_spec = pulse.spectral_intensity
-    result_spec = scipy.interpolate.interp1d(
-        pulse.wl, result_spec, bounds_error=False, fill_value=0.0
-    )(fund.wavelengths)
-    fund_intensities_bkg_sub *= pypret.lib.best_scale(
-        fund_intensities_bkg_sub, result_spec
-    )
-    rms_error = pypret.lib.nrms(fund_intensities_bkg_sub, result_spec)
-    logger.info(f"RMS spectrum error: {rms_error}")
-
-    # Find position of smallest FWHM
-    result_parameter = result.parameter
-    result_parameter_mid_idx = np.floor(len(pulse.field) / 2) + 1
-    result_profile = np.zeros((len(pulse.field), len(result_parameter)))
-    fwhm = np.zeros((len(result_parameter), 1))
-    for i, p in enumerate(result_parameter):
-        pulse.spectrum = result.pulse_retrieved * result.pnps.mask(p)
-        profile = np.power(np.abs(pulse.field), 2)[:]
-        profile_max_idx = np.argmax(profile)
-        result_profile[:, i] = np.roll(
-            profile, -round(profile_max_idx - result_parameter_mid_idx)
+        result.plot.plot(
+            fundamental=fund_intensities_bkg_sub,
+            fundamental_wavelength=fund.wavelengths,
+            oversampling=8,
+            phase_blanking=True,
+            phase_blanking_threshold=0.01,
+            limit=True,
+            FTL=FTL,
         )
-        try:
-            fwhm[i] = pulse.fwhm(dt=pulse.dt / 100)
-        except Exception:
-            fwhm[i] = np.nan
-    result_optimum_idx = np.nanargmin(fwhm)
-    result_optimum_fwhm = fwhm[result_optimum_idx]
+        return result
 
-    # Plot FWHM vs grating position
-    if verbose:
-        plt.close("all")
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        fig = plt.plot(scan.positions * 1e3, fwhm * 1e15)
-        ax.tick_params(labelsize=12)
-        plt.xlabel("Position (mm)")
-        plt.ylabel("FWHM (fs)")
-        plt.title(
-            "Shortest: "
-            + str(np.round(result_optimum_fwhm[0] * 1e15, 1))
-            + " fs @ "
-            + str(np.round(scan.positions[result_optimum_idx] * 1e3, 3))
-            + "mm"
+
+"""
+    def acquire_data(self):
+        motor = None  # TODO
+
+        if self.auto_fund:
+            try:
+                motor.move_to(self.auto_fund_pos_scan, True)
+            except Exception:
+                motor.move_to(self.auto_fund_pos_scan, False)
+                time.sleep(15)
+        self.ESP_stage_device.move_to(
+            self.ESP_axis_stage_grating, self.scan_pos_center, True
         )
-        plt.ylim(
-            0,
-            min([np.nanmax(fwhm * 1e15), 4 * result_optimum_fwhm * 1e15]),
-        )
-        plt.show()
-
-    # Plot temporal profile vs grating position
-    if verbose:
-        plt.close("all")
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        fig = plt.contourf(
-            pulse.t * 1e15,
-            scan.positions * 1e3,
-            result_profile.transpose(),
-            200,
-            cmap="nipy_spectral",
-        )
-        ax.tick_params(labelsize=12)
-        plt.xlabel("Time (fs)")
-        plt.ylabel("Position (mm)")
-        plt.title("Dscan Temporal Profile")
-        plt.xlim(-8 * result_optimum_fwhm * 1e15, 8 * result_optimum_fwhm * 1e15)
-        plt.show()
-
-    # Plot results (Pypret style)
-    if plot_position is None:
-        pypret_plot_parameter = result_parameter[result_optimum_idx]
-        final_position = scan.positions[result_optimum_idx]
-    else:
-        pypret_plot_parameter = result_parameter[
-            (np.nanargmin(np.abs(scan.positions - plot_position * 1e-3)))
-        ]
-        final_position = plot_position
-
-    plot = RetrievalResultPlot(
-        result,
-        pypret_plot_parameter,
-        spec_fund_range,
-        spec_scan_range,
-        final_position,
-        scan.positions,
-    )
-    plot.plot(
-        fundamental=fund_intensities_bkg_sub,
-        fundamental_wavelength=fund.wavelengths,
-        oversampling=8,
-        phase_blanking=True,
-        phase_blanking_threshold=0.01,
-        limit=True,
-        FTL=FTL,
-    )
-    return plot
-
-
-def acquire_data(self):
-    motor = None  # TODO
-
-    if self.auto_fund:
-        try:
-            motor.move_to(self.auto_fund_pos_scan, True)
-        except Exception:
-            motor.move_to(self.auto_fund_pos_scan, False)
-            time.sleep(15)
-    self.ESP_stage_device.move_to(
-        self.ESP_axis_stage_grating, self.scan_pos_center, True
-    )
-    # self.spec_scan = oo.spectrum(
-    #     specs.devices,
-    #     integration_time=self.spec_time_scan,
-    #     averages=self.spec_avgs_scan,
-    # )
-    if self.preview:
-        logger.info("Check SHG spectrum. Close window to continue.")
-        self.spec_scan.plot_live(wavelength_limits=self.spec_scan_range)
-        logger.info("Continuing...")
-    self.scan_position_list = []
-    for counter, pos in enumerate(self.scan_points_list):
-        self.ESP_stage_device.move_to(self.ESP_axis_stage_grating, pos, True)
-        self.scan_position_list.append(
-            self.ESP_stage_device.position(self.ESP_axis_stage_grating)
-        )
-        self.spec_scan.collect_intensities()
-        if counter == 0:
-            wavelength = self.spec_scan.wavelength
-            self.wavelength_scan = wavelength[
+        # self.spec_scan = oo.spectrum(
+        #     specs.devices,
+        #     integration_time=self.spec_time_scan,
+        #     averages=self.spec_avgs_scan,
+        # )
+        if self.preview:
+            logger.info("Check SHG spectrum. Close window to continue.")
+            self.spec_scan.plot_live(wavelength_limits=self.spec_scan_range)
+            logger.info("Continuing...")
+        self.scan_position_list = []
+        for counter, pos in enumerate(self.scan_points_list):
+            self.ESP_stage_device.move_to(self.ESP_axis_stage_grating, pos, True)
+            self.scan_position_list.append(
+                self.ESP_stage_device.position(self.ESP_axis_stage_grating)
+            )
+            self.spec_scan.collect_intensities()
+            if counter == 0:
+                wavelength = self.spec_scan.wavelength
+                self.wavelength_scan = wavelength[
+                    (wavelength > self.spec_scan_range[0])
+                    & (wavelength < self.spec_scan_range[1])
+                ]
+                wavelength_cut = self.wavelength_scan
+                scan_data = np.insert(wavelength_cut, 0, np.nan)
+            intensities = self.spec_scan.intensities
+            intensities_cut = intensities[
                 (wavelength > self.spec_scan_range[0])
                 & (wavelength < self.spec_scan_range[1])
             ]
-            wavelength_cut = self.wavelength_scan
-            scan_data = np.insert(wavelength_cut, 0, np.nan)
-        intensities = self.spec_scan.intensities
-        intensities_cut = intensities[
-            (wavelength > self.spec_scan_range[0])
-            & (wavelength < self.spec_scan_range[1])
-        ]
-        intensities_cut_pos = np.insert(
-            intensities_cut, 0, self.scan_position_list[counter]
+            intensities_cut_pos = np.insert(
+                intensities_cut, 0, self.scan_position_list[counter]
+            )
+            scan_data = np.column_stack((scan_data, intensities_cut_pos))
+        if not os.path.exists(os.path.dirname(self.path_full_scan)):
+            os.makedirs(os.path.dirname(self.path_full_scan))
+        np.savetxt(self.path_full_scan, scan_data)
+        self.ESP_stage_device.move_to(
+            self.ESP_axis_stage_grating, self.scan_pos_center, True
         )
-        scan_data = np.column_stack((scan_data, intensities_cut_pos))
-    if not os.path.exists(os.path.dirname(self.path_full_scan)):
-        os.makedirs(os.path.dirname(self.path_full_scan))
-    np.savetxt(self.path_full_scan, scan_data)
-    self.ESP_stage_device.move_to(
-        self.ESP_axis_stage_grating, self.scan_pos_center, True
-    )
 
-    scan = ScanData(
-        positions=scan_data[0, 1:],
-        intensities=scan_data[1:, 1:],
-        wavelengths=scan_data[1:, 0],
-    )
-    plt.close("all")
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig = plt.contourf(scan.positions, scan.wavelengths, scan.intensities.T, 100)
-    ax.set_ylabel("Grating position (mm)", size=12)
-    ax.set_xlabel("Wavelength (nm)", size=12)
-    ax.tick_params(labelsize=12)
-    plt.show()
-    return scan_data
+        scan = ScanData(
+            positions=scan_data[0, 1:],
+            intensities=scan_data[1:, 1:],
+            wavelengths=scan_data[1:, 0],
+        )
+        plt.close("all")
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        fig = plt.contourf(scan.positions, scan.wavelengths, scan.intensities.T, 100)
+        ax.set_ylabel("Grating position (mm)", size=12)
+        ax.set_xlabel("Wavelength (nm)", size=12)
+        ax.tick_params(labelsize=12)
+        plt.show()
+        return scan_data
+"""
