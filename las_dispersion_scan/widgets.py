@@ -1,9 +1,12 @@
-from typing import ClassVar, Protocol, Type
+import enum
+from typing import ClassVar, Optional, Protocol, Type
 
+import matplotlib.figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from qtpy import QtWidgets
 from qtpy.uic import loadUiType
 
-from . import utils
+from . import options, utils
 
 
 class _UiForm(Protocol):
@@ -22,13 +25,15 @@ class DesignerDisplay:
     filename: ClassVar[str]
     ui_form: ClassVar[Type[_UiForm]]
 
-    def __init_subclass__(cls):
-        """Read the file when the class is created"""
-        super().__init_subclass__()
-        cls.ui_form, _ = loadUiType(str(utils.SOURCE_PATH / "ui" / cls.filename))
+    @classmethod
+    def _load_ui_if_needed(cls):
+        """Load the UI file on first load."""
+        if not hasattr(cls, "ui_form"):
+            cls.ui_form, _ = loadUiType(str(utils.SOURCE_PATH / "ui" / cls.filename))
 
     def __init__(self, *args, **kwargs):
         """Apply the file to this widget when the instance is created"""
+        self._load_ui_if_needed()
         super().__init__(*args, **kwargs)
         self.ui_form.setupUi(self, self)
 
@@ -54,6 +59,50 @@ class DesignerDisplay:
                     print(
                         f"{attr}: {obj.__class__.__module__}.{obj.__class__.__name__}"
                     )
+
+
+class EnumComboBox(QtWidgets.QComboBox):
+    enum_cls: ClassVar[Type[enum.Enum]]
+    enum_default: ClassVar[enum.Enum]
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        for option in self.enum_cls:
+            self.addItem(option.value)
+
+        self.setCurrentIndex(list(self.enum_cls).index(self.enum_default))
+
+
+class MaterialComboBox(EnumComboBox):
+    enum_cls = options.Material
+    enum_default = options.Material.bk7
+
+
+class NonlinearComboBox(EnumComboBox):
+    enum_cls = options.NonlinearProcess
+    enum_default = options.NonlinearProcess.shg
+
+
+class PulseAnalysisComboBox(EnumComboBox):
+    enum_cls = options.PulseAnalysisMethod
+    enum_default = options.PulseAnalysisMethod.dscan
+
+
+class SolverComboBox(EnumComboBox):
+    enum_cls = options.RetrieverSolver
+    enum_default = options.RetrieverSolver.copra
+
+
+class PlotWidget(FigureCanvasQTAgg):
+    def __init__(
+        self, parent: Optional[QtWidgets.QWidget] = None, width=5, height=4, dpi=100
+    ):
+        fig = matplotlib.figure.Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        super().__init__(fig)
+
+        if parent is not None:
+            self.setParent(parent)
 
 
 class DscanMain(DesignerDisplay, QtWidgets.QWidget):
