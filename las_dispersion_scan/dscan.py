@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import enum
 import logging
 import os
 from typing import Optional, Tuple, cast
@@ -14,67 +13,11 @@ import pypret.frequencies
 import scipy.interpolate
 from scipy.ndimage import gaussian_filter
 
+from .options import Material, NonlinearProcess, PulseAnalysisMethod, RetrieverSolver
 from .plotting import RetrievalResultPlot
 from .utils import RetrievalResultStandin, get_pulse_spectrum, preprocess
 
 logger = logging.getLogger(__name__)
-
-
-oo = None  # TODO remove ocean optics references
-
-
-class PulseAnalysisMethod(str, enum.Enum):
-    frog = "frog"
-    tdp = "tdp"
-    dscan = "dscan"
-    miips = "miips"
-    ifrog = "ifrog"
-
-
-class NonlinearProcess(str, enum.Enum):
-    shg = "shg"
-    xpw = "xpw"
-    thg = "thg"
-    sd = "sd"
-    pg = "pg"
-
-
-class Material(str, enum.Enum):
-    fs = "FS"
-    bk7 = "BK7"
-    gratinga = "gratinga"
-    gratingc = "gratingc"
-
-    def get_coefficient(self, wedge_angle: float) -> float:
-        if self in {Material.gratinga, Material.gratingc}:
-            return 4.0
-
-        if self in {Material.bk7, Material.fs}:
-            return np.tan(wedge_angle * np.pi / 180) * np.cos(wedge_angle * np.pi / 360)
-
-        raise ValueError("Unsupported material type")
-
-    @property
-    def pypret_material(self) -> pypret.material.BaseMaterial:
-        """The pypret material."""
-        return {
-            Material.fs: pypret.material.FS,
-            Material.bk7: pypret.material.BK7,
-            Material.gratinga: pypret.material.gratinga,
-            Material.gratingc: pypret.material.gratingc,
-        }[self]
-
-
-class RetrieverSolver(str, enum.Enum):
-    copra = "copra"
-    gpa = "gpa"
-    gp_dscan = "gp-dscan"
-    pcgpa = "pcgpa"
-    pie = "pie"
-    lm = "lm"
-    bfgs = "bfgs"
-    de = "de"
-    nelder_mead = "nelder-mead"
 
 
 def get_fundamental_spectrum(
