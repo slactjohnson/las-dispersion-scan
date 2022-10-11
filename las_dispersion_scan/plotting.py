@@ -35,6 +35,32 @@ def plot_complex_phase(
     amplitude_line: str = "r-",
     phase_line: str = "b-",
 ):
+    """
+    Plot complex phase.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        X-axis.
+    y : np.ndarray
+        Y-axis.
+    ax : plt.Axes
+        The axis for amplitude.
+    ax2 : plt.Axes
+        The axis for phase.
+    yaxis : PlotYAxis, optional
+        Y axis option.
+    limit : bool, optional
+        Determine and apply a limit using pypret.
+    phase_blanking : bool, optional
+        Enable phase blanking with pypret masking.
+    phase_blanking_threshold : float, optional
+        Phase blanking threshold.
+    amplitude_line : str, optional
+        Line options for matplotlib for the amplitude plot.
+    phase_line : str, optional
+        Line options for matplotlib for the phase plot.
+    """
     if yaxis == "intensity":
         amp = pypret.lib.abs2(y)
     elif yaxis == "amplitude":
@@ -92,6 +118,8 @@ class RetrievalResultPlot:
         xaxis = PlotXAxis(xaxis)
         yaxis = PlotYAxis(yaxis)
 
+        assert self.retrieval_result.pnps is not None
+
         # reconstruct a pulse from that
         pulse = pypret.Pulse(
             self.retrieval_result.pnps.ft, self.retrieval_result.pnps.w0, unit="om"
@@ -126,7 +154,7 @@ class RetrievalResultPlot:
         profile_max_idx = np.abs(field2).argmax()
         field3 = np.roll(field2, -round(profile_max_idx - result_parameter_mid_idx))
 
-        li11, li12, tamp2, tpha2 = pypret.graphics.plot_complex(
+        li11, li12, _, _ = pypret.graphics.plot_complex(
             t,
             field3,
             ax1,
@@ -187,7 +215,7 @@ class RetrievalResultPlot:
             raise ValueError(f"Unsupported x-axis for plotting: {xaxis}")
 
         # Plot in spectral domain
-        li21, li22, samp2, spha2 = pypret.graphics.plot_complex_phase(
+        li21, li22, _, _ = pypret.graphics.plot_complex_phase(
             w,
             spectrum2,
             ax2,
@@ -222,12 +250,12 @@ class RetrievalResultPlot:
 
         axes = [ax3, ax4, ax5]
         sc = 1.0 / self.retrieval_result.trace_input.max()
+
+        diff = self.retrieval_result.trace_input - self.retrieval_result.trace_retrieved
         traces = [
             self.retrieval_result.trace_input * sc,
             self.retrieval_result.trace_retrieved * sc,
-            (self.retrieval_result.trace_input - self.retrieval_result.trace_retrieved)
-            * self.retrieval_result.weights
-            * sc,
+            diff * self.retrieval_result.weights * sc,
         ]
         titles = ["measured", "retrieved", "difference"]
         if np.any(self.retrieval_result.weights != 1.0):
@@ -252,11 +280,15 @@ class RetrievalResultPlot:
             # plt.xticks(fontsize=8)
             # ax.set_xlabel(md.labels[1])
             ax.set_xlabel("frequency")
-            ax.set_ylabel(md.labels[0])
-            fx = EngFormatter(unit=md.units[1])
-            ax.xaxis.set_major_formatter(fx)
-            fy = EngFormatter(unit=md.units[0])
-            ax.yaxis.set_major_formatter(fy)
+            if md.labels is not None:
+                ax.set_ylabel(md.labels[0])
+
+            if md.units is not None:
+                fx = EngFormatter(unit=md.units[1])
+                ax.xaxis.set_major_formatter(fx)
+                fy = EngFormatter(unit=md.units[0])
+                ax.yaxis.set_major_formatter(fy)
+
             ax.set_title(title)
             scan_padding = 75  # (nm)
             ax.set_xlim(
