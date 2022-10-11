@@ -121,7 +121,7 @@ class SpectrumData:
     wavelengths: np.ndarray
     intensities: np.ndarray
 
-    def get_pulse_from_spectrum(self, ft: pypret.FourierTransform) -> pypret.Pulse:
+    def _get_pulse_from_spectrum(self, ft: pypret.FourierTransform) -> pypret.Pulse:
         pulse = pypret.Pulse(ft, self.raw_center)
         _, fund_intensities_bkg_sub = self.subtract_background()
         return pulse_from_spectrum(
@@ -131,7 +131,7 @@ class SpectrumData:
         )
 
     def get_fourier_transform_limit(self, ft: pypret.FourierTransform) -> float:
-        pulse = self.get_pulse_from_spectrum(ft)
+        pulse = self._get_pulse_from_spectrum(ft)
         return pulse.fwhm(dt=pulse.dt / 100)
 
     @property
@@ -255,29 +255,30 @@ class SpectrumData:
 
     def plot(self, pulse: Optional[pypret.Pulse] = None):
         fig, ax = plt.subplots()
+        ax = cast(plt.Axes, ax)
         wavelength_bkg, intensities_bkg = self.get_background(count=15)
         intensities_bkg_fit, _ = self.subtract_background(count=15)
 
-        plt.plot(self.wavelengths * 1e9, self.intensities, "k", label="All data")
-        plt.plot(
+        ax.plot(self.wavelengths * 1e9, self.intensities, "k", label="All data")
+        ax.plot(
             wavelength_bkg * 1e9,
             intensities_bkg,
             "xb",
             label="Points for fit",
         )
-        plt.plot(
+        ax.plot(
             self.wavelengths * 1e9,
             intensities_bkg_fit,
             "r",
             label="Background fit",
         )
         plt.legend()
-        plt.xlabel("Wavelength (nm)")
-        plt.ylabel("Counts (arb.)")
+        ax.set_xlabel("Wavelength (nm)")
+        ax.set_ylabel("Counts (arb.)")
 
         if pulse is not None:
             ftl = pulse.fwhm(dt=pulse.dt / 100)
-            plt.title(f"Fundamental Spectrum (FTL) = {ftl * 1e15:.1f} fs")
+            ax.set_title(f"Fundamental Spectrum (FTL) = {ftl * 1e15:.1f} fs")
 
         return fig, ax
 
@@ -425,7 +426,7 @@ class PypretResult:
     result_parameter: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
     fourier_transform_limit: float = 0.0
 
-    def get_fourier_transform(self) -> pypret.FourierTransform:
+    def _get_fourier_transform(self) -> pypret.FourierTransform:
         # Create frequency-time grid
         freq_bandwidth = (
             self.freq_bandwidth_wl
@@ -460,31 +461,20 @@ class PypretResult:
         ax = cast(plt.Axes, md.ax)
         ax.set_title("Cropped scan")
         ax.set_xlim(
-            [
-                (self.spec_scan_range[0] + scan_padding_nm) * 1e-9,
-                (self.spec_scan_range[1] - scan_padding_nm) * 1e-9,
-            ]
+            (self.spec_scan_range[0] + scan_padding_nm) * 1e-9,
+            (self.spec_scan_range[1] - scan_padding_nm) * 1e-9,
         )
         return md
 
     def plot_processed_scan(self, *, scan_padding_nm: int = 75):
+        factor = 2 * np.pi * 2.99792 * 1e17
         md = pypret.MeshDataPlot(self.trace, show=False)
         ax = cast(plt.Axes, md.ax)
         ax.set_title("Processed scan")
         ax.set_xlabel("Frequency")
         ax.set_xlim(
-            [
-                2
-                * np.pi
-                * 2.99792
-                * 1e17
-                / (self.spec_scan_range[1] - scan_padding_nm),
-                2
-                * np.pi
-                * 2.99792
-                * 1e17
-                / (self.spec_scan_range[0] + scan_padding_nm),
-            ]
+            factor / (self.spec_scan_range[1] - scan_padding_nm),
+            factor / (self.spec_scan_range[0] + scan_padding_nm),
         )
         return md
 
@@ -527,14 +517,14 @@ class PypretResult:
         ax = cast(plt.Axes, fig.add_subplot(111))
         fig = plt.plot(self.scan.positions * 1e3, self.fwhm * 1e15)
         ax.tick_params(labelsize=12)
-        plt.xlabel("Position (mm)")
-        plt.ylabel("FWHM (fs)")
+        ax.set_xlabel("Position (mm)")
+        ax.set_ylabel("FWHM (fs)")
 
         result_optimum_fwhm = self.optimum_fwhm
         fwhm0 = result_optimum_fwhm * 1e15
         pos = self.scan.positions[self.optimum_fwhm_idx] * 1e3
-        plt.title(f"Shortest: {fwhm0:.1f} fs @ {pos:.3f} mm")
-        plt.ylim(
+        ax.set_title(f"Shortest: {fwhm0:.1f} fs @ {pos:.3f} mm")
+        ax.set_ylim(
             0,
             min([np.nanmax(self.fwhm * 1e15), 4 * result_optimum_fwhm * 1e15]),
         )
@@ -552,10 +542,10 @@ class PypretResult:
             cmap="nipy_spectral",
         )
         ax.tick_params(labelsize=12)
-        plt.xlabel("Time (fs)")
-        plt.ylabel("Position (mm)")
-        plt.title("Dscan Temporal Profile")
-        plt.xlim(-8 * self.optimum_fwhm * 1e15, 8 * self.optimum_fwhm * 1e15)
+        ax.set_xlabel("Time (fs)")
+        ax.set_ylabel("Position (mm)")
+        ax.set_title("Dscan Temporal Profile")
+        ax.set_xlim(-8 * self.optimum_fwhm * 1e15, 8 * self.optimum_fwhm * 1e15)
         return fig
 
     @property
@@ -666,10 +656,10 @@ class PypretResult:
         )
         logger.info(f"Fundamental center wavelength: {fund.raw_center * 1e9:.1f} nm")
 
-        ft = result.get_fourier_transform()
+        ft = result._get_fourier_transform()
         logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
 
-        result.pulse = fund.get_pulse_from_spectrum(ft)
+        result.pulse = fund._get_pulse_from_spectrum(ft)
         result.fourier_transform_limit = result.pulse.fwhm(dt=result.pulse.dt / 100)
 
         logger.info(

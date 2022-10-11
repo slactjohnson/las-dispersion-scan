@@ -85,7 +85,7 @@ class RetrievalResultPlot:
         oversampling: int = 0,
         phase_blanking: bool = False,
         phase_blanking_threshold=1e-3,
-        show: bool = True,
+        show: bool = False,
     ):
         xaxis = PlotXAxis(xaxis)
         yaxis = PlotYAxis(yaxis)
@@ -273,13 +273,10 @@ class RetrievalResultPlot:
         self.li11, self.li12, self.li21, self.li22 = li11, li12, li21, li22
         self.ax3, self.ax4, self.ax5 = ax3, ax4, ax5
 
+        gs1.update(left=0.05, right=0.95, top=0.9, bottom=0.1, hspace=0.25, wspace=0.3)
+        gs2.update(left=0.1, right=0.95, top=0.9, bottom=0.1, hspace=0.5, wspace=1.0)
+
         if show:
-            # gs.tight_layout(fig)
-            gs1.update(
-                left=0.05, right=0.95, top=0.9, bottom=0.1, hspace=0.25, wspace=0.3
-            )
-            gs2.update(
-                left=0.1, right=0.95, top=0.9, bottom=0.1, hspace=0.5, wspace=1.0
-            )
             plt.savefig("pypret_retrieval.png")
             plt.show()
+        return fig
