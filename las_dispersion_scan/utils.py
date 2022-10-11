@@ -1,3 +1,4 @@
+import pathlib
 from types import SimpleNamespace
 from typing import Optional, Tuple
 
@@ -6,6 +7,8 @@ import pypret
 import pypret.frequencies
 import scipy
 import scipy.interpolate
+
+SOURCE_PATH = pathlib.Path(__file__).resolve().parent
 
 
 def get_pulse_spectrum(
