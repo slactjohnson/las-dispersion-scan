@@ -4,15 +4,18 @@ import copy
 import dataclasses
 import logging
 import os
-from typing import Optional, Tuple, cast
+import pathlib
+from typing import Optional, Tuple, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pypret
 import pypret.frequencies
 import scipy.interpolate
+from matplotlib.ticker import EngFormatter
 from scipy.ndimage import gaussian_filter
 
+from . import plotting
 from .options import Material, NonlinearProcess, PulseAnalysisMethod, RetrieverSolver
 from .plotting import RetrievalResultPlot
 from .utils import RetrievalResultStandin, get_pulse_spectrum, preprocess
@@ -142,7 +145,7 @@ class SpectrumData:
         return cls.from_file(filename)
 
     @classmethod
-    def from_path(cls, path: str) -> SpectrumData:
+    def from_path(cls, path: Union[pathlib.Path, str]) -> SpectrumData:
         """
         Load spectra from either the old .txt file format or a the new .dat
         file format, given a path.
@@ -170,7 +173,7 @@ class SpectrumData:
         raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
 
     @classmethod
-    def from_file(cls, path: str) -> SpectrumData:
+    def from_file(cls, path: Union[pathlib.Path, str]) -> SpectrumData:
         """
         Load fundamental spectrum data from the old .txt file format or the new
         .dat format.
@@ -371,7 +374,7 @@ class ScanData:
         return cls(positions, wavelengths, intensities)
 
     @classmethod
-    def from_path(cls, path: str) -> ScanData:
+    def from_path(cls, path: Union[pathlib.Path, str]) -> ScanData:
         """
         Load scan positions and spectra from either the old .txt file format
         or a the new .dat file format, given a path.
@@ -535,7 +538,9 @@ class PypretResult:
         )
         return md
 
-    def plot_processed_scan(self, *, scan_padding_nm: int = 75) -> pypret.MeshDataPlot:
+    def plot_processed_scan(
+        self, *, fig: Optional[plt.Figure] = None, scan_padding_nm: int = 75
+    ) -> pypret.MeshDataPlot:
         """
         Plot the processed mesh scan data from ``self.trace``.
 
@@ -558,6 +563,220 @@ class PypretResult:
             factor / (self.spec_scan_range[0] + scan_padding_nm),
         )
         return md
+
+    def plot_time_domain_retrieval(
+        self,
+        fig: Optional[plt.Figure] = None,
+        yaxis: plotting.PlotYAxis = plotting.PlotYAxis.intensity,
+        limit: bool = True,
+        oversampling: int = 8,
+        phase_blanking: bool = True,
+        phase_blanking_threshold: float = 1e-3,
+    ) -> Tuple[plt.Figure, plt.Axes, plt.Axes]:
+        """
+        Plot the retrieval result in the time domain.
+
+        Parameters
+        ----------
+        fig : plt.Figure or None, optional
+            An optional figure to use for the plot.
+        yaxis : plotting.PlotYAxis, optional
+            The Y axis setting.
+        limit : bool, optional
+            Determine and apply a limit using pypret.
+        oversampling : int, optional
+            Oversampling count
+        phase_blanking : bool, optional
+            Enable phase blanking with pypret masking.
+        phase_blanking_threshold : float, optional
+            Phase blanking threshold.
+
+        Returns
+        -------
+        Tuple[plt.Figure, plt.Axes, plt.Axes]
+
+        """
+        assert self.plot is not None
+        assert self.retrieval is not None
+        assert self.retrieval.pnps is not None
+
+        # construct the figure
+        if fig is None:
+            fig = cast(plt.Figure, plt.figure())
+
+        ax1 = cast(plt.Axes, fig.subplots(nrows=1, ncols=1))
+        ax12 = cast(plt.Axes, ax1.twinx())
+
+        # reconstruct a pulse from that
+        pulse = pypret.Pulse(self.retrieval.pnps.ft, self.retrieval.pnps.w0, unit="om")
+
+        # Plot in time domain
+        pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
+            self._plot_param
+        )
+        if oversampling:
+            t = np.linspace(pulse.t[0], pulse.t[-1], pulse.N * oversampling)
+            field2 = pulse.field_at(t)
+        else:
+            t = pulse.t
+            field2 = pulse.field
+        field2 /= np.abs(field2).max()
+
+        result_parameter_mid_idx = np.floor(len(field2) / 2) + 1
+        profile_max_idx = np.abs(field2).argmax()
+        field3 = np.roll(field2, -round(profile_max_idx - result_parameter_mid_idx))
+
+        li11, li12, _, _ = pypret.graphics.plot_complex(
+            t,
+            field3,
+            ax1,
+            ax12,
+            yaxis=yaxis.value,
+            phase_blanking=phase_blanking,
+            limit=limit,
+            phase_blanking_threshold=phase_blanking_threshold,
+        )
+        li11.set_linewidth(3.0)
+        li11.set_color("#1f77b4")
+        li11.set_alpha(0.6)
+        li12.set_linewidth(3.0)
+        li12.set_color("#ff7f0e")
+        li12.set_alpha(0.6)
+
+        fwhm = np.round(pulse.fwhm(dt=pulse.dt / 100) / 1e-15, 2)
+
+        fx = EngFormatter(unit="s")
+        ax1.xaxis.set_major_formatter(fx)
+        ax1.set_title(
+            f"time domain @ {self._final_plot_position:.3f} mm (FWHM = {fwhm} fs)"
+        )
+        ax1.set_xlabel("time")
+        ax1.set_ylabel(yaxis.value)
+        ax12.set_ylabel("phase (rad)")
+        ax1.legend([li11, li12], [yaxis.value, "phase"])
+        ax1.set_xlim([-10 * 1e-15 * np.round(fwhm, 0), 10 * 1e-15 * np.round(fwhm, 0)])
+        return fig, ax1, ax12
+
+    def plot_frequency_domain_retrieval(
+        self,
+        fig: Optional[plt.Figure] = None,
+        xaxis: plotting.PlotXAxis = plotting.PlotXAxis.wavelength,
+        yaxis: plotting.PlotYAxis = plotting.PlotYAxis.intensity,
+        limit: bool = True,
+        oversampling: int = 8,
+        phase_blanking: bool = True,
+        phase_blanking_threshold: float = 1e-3,
+    ) -> Tuple[plt.Figure, plt.Axes, plt.Axes]:
+        """
+        Plot the retrieval result in the time domain.
+
+        Parameters
+        ----------
+        fig : plt.Figure or None, optional
+            An optional figure to use for the plot.
+        xaxis : plotting.PlotXAxis, optional
+            The X axis setting.
+        yaxis : plotting.PlotYAxis, optional
+            The Y axis setting.
+        limit : bool, optional
+            Determine and apply a limit using pypret.
+        oversampling : int, optional
+            Oversampling count
+        phase_blanking : bool, optional
+            Enable phase blanking with pypret masking.
+        phase_blanking_threshold : float, optional
+            Phase blanking threshold.
+
+        Returns
+        -------
+        Tuple[plt.Figure, plt.Axes, plt.Axes]
+
+        """
+        assert self.plot is not None
+        assert self.retrieval is not None
+        assert self.retrieval.pnps is not None
+
+        # construct the figure
+        if fig is None:
+            fig = cast(plt.Figure, plt.figure())
+
+        ax2 = cast(plt.Axes, fig.subplots(nrows=1, ncols=1))
+        ax22 = cast(plt.Axes, ax2.twinx())
+
+        # reconstruct a pulse from that
+        pulse = pypret.Pulse(self.retrieval.pnps.ft, self.retrieval.pnps.w0, unit="om")
+
+        # Plot in time domain
+        pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
+            self._plot_param
+        )
+
+        if oversampling:
+            w = np.linspace(pulse.w[0], pulse.w[-1], pulse.N * oversampling)
+            spectrum2 = pulse.spectrum_at(w)
+            pulse.spectrum = self.retrieval.pulse_retrieved
+        else:
+            w = pulse.w
+            spectrum2 = self.retrieval.pulse_retrieved
+        fund_w = (
+            pypret.frequencies.convert(self.fund.wavelengths, "wl", "om") - pulse.w0
+        )
+        scale = np.abs(spectrum2).max()
+        spectrum2 /= scale
+        if self.fund is None:
+            fundamental = None
+        else:
+            fundamental = np.copy(
+                self.fund_intensities_bkg_sub,
+            )
+            scale_fund = np.abs(fundamental).max()
+            fundamental /= scale_fund
+
+        if xaxis == plotting.PlotXAxis.wavelength:
+            w = pypret.frequencies.convert(w + pulse.w0, "om", "wl")
+            fund_w = self.fund.wavelengths
+            unit = "m"
+            label = "wavelength"
+        elif xaxis == plotting.PlotXAxis.frequency:
+            unit = " rad Hz"
+            label = "frequency"
+        else:
+            raise ValueError(f"Unsupported x-axis for plotting: {xaxis}")
+
+        # Plot in spectral domain
+        li21, li22, _, _ = pypret.graphics.plot_complex_phase(
+            w,
+            spectrum2,
+            ax2,
+            ax22,
+            yaxis=yaxis.value,
+            phase_blanking=phase_blanking,
+            limit=limit,
+            phase_blanking_threshold=phase_blanking_threshold,
+        )
+        lines = [li21, li22]
+        labels = ["intensity", "phase"]
+        if fundamental is not None:
+            (li31,) = ax2.plot(fund_w, fundamental, "r", ms=4.0, mew=1.0, zorder=0)
+            lines.append(li31)
+            labels.append("measurement")
+        li21.set_linewidth(3.0)
+        li21.set_color("#1f77b4")
+        li21.set_alpha(0.6)
+        li22.set_linewidth(3.0)
+        li22.set_color("#ff7f0e")
+        li22.set_alpha(0.6)
+
+        fx = EngFormatter(unit=unit)
+        ax2.xaxis.set_major_formatter(fx)
+        ftl = self.fourier_transform_limit * 1e15
+        ax2.set_title(f"frequency domain (FTL = {ftl:.2f} fs)")
+        ax2.set_xlabel(label)
+        ax2.set_ylabel(yaxis.value)
+        ax22.set_ylabel("phase (rad)")
+        ax2.legend(lines, labels)
+        ax2.set_xlim([self.spec_fund_range[0] * 1e-9, self.spec_fund_range[1] * 1e-9])
+        return fig, ax2, ax22
 
     def _calculate_fwhm_and_profile(self) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -616,7 +835,7 @@ class PypretResult:
         """
         fig = plt.figure()
         ax = cast(plt.Axes, fig.add_subplot(111))
-        fig = plt.plot(self.scan.positions * 1e3, self.fwhm * 1e15)
+        ax.plot(self.scan.positions * 1e3, self.fwhm * 1e15)
         ax.tick_params(labelsize=12)
         ax.set_xlabel("Position (mm)")
         ax.set_ylabel("FWHM (fs)")
@@ -744,6 +963,22 @@ class PypretResult:
             maxiter=self.max_iter,
         )
 
+    @property
+    def _plot_param(self) -> float:
+        """Plot parameter for RetrievalResultPlot"""
+        if self.plot_position is None:
+            return self.retrieval.parameter[self.optimum_fwhm_idx]
+        return self.retrieval.parameter[
+            (np.nanargmin(np.abs(self.scan.positions - self.plot_position * 1e-3)))
+        ]
+
+    @property
+    def _final_plot_position(self):
+        """Final plot position for RetrievalResultPlot"""
+        if self.plot_position is None:
+            return self.scan.positions[self.optimum_fwhm_idx]
+        return self.plot_position
+
     def _get_retrieval_plot(
         self, plot_position: Optional[float] = None
     ) -> RetrievalResultPlot:
@@ -761,21 +996,12 @@ class PypretResult:
         -------
         RetrievalResultPlot
         """
-        if plot_position is None:
-            plot_param = self.retrieval.parameter[self.optimum_fwhm_idx]
-            final_position = self.scan.positions[self.optimum_fwhm_idx]
-        else:
-            plot_param = self.retrieval.parameter[
-                (np.nanargmin(np.abs(self.scan.positions - plot_position * 1e-3)))
-            ]
-            final_position = plot_position
-
         return RetrievalResultPlot(
             retrieval_result=self.retrieval,
-            retrieval_parameter=plot_param,
+            retrieval_parameter=self._plot_param,
             fund_range=self.spec_fund_range,
             scan_range=self.spec_scan_range,
-            final_position=final_position,
+            final_position=self._final_plot_position,
             scan_positions=self.scan.positions,
             fundamental=self.fund_intensities_bkg_sub,
             fundamental_wavelength=self.fund.wavelengths,
@@ -943,3 +1169,29 @@ class PypretResult:
             plt.show()
 
         return result
+
+
+@dataclasses.dataclass
+class Acquisition:
+    fundamental: SpectrumData
+    scan: ScanData
+
+    @classmethod
+    def from_path(cls, path: Union[pathlib.Path, str]) -> Acquisition:
+        """
+        Load fundamental spectrum and scan data from a path.
+
+        Parameters
+        ----------
+        path : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        Acquisition
+            The data from the scan.
+        """
+        return cls(
+            fundamental=SpectrumData.from_path(path),
+            scan=ScanData.from_path(path),
+        )
