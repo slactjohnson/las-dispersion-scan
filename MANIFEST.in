@@ -11,9 +11,4 @@ recursive-include docs *.rst conf.py Makefile make.bat
 
 include versioneer.py
 
-# If including data files in the package, add a single file/glob:
-#
-# include path/to/data_file
-#
-# Or multiple recursively:
-# recursive-include path file*glob1* file*glob*2
+recursive-include las_dispersion_scan *.ui *.qss

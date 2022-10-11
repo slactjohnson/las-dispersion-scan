@@ -11,10 +11,10 @@ import logging
 
 import las_dispersion_scan
 
-DESCRIPTION = __doc__
+DESCRIPTION = str(__doc__)
 
 
-MODULES = ("help",)
+MODULES = ("gui",)
 
 
 def _try_import(module):
