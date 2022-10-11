@@ -1,6 +1,6 @@
 import dataclasses
 import enum
-from typing import Any, Optional, cast
+from typing import Optional, Tuple, cast
 
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -9,6 +9,8 @@ import pypret
 import pypret.frequencies
 import pypret.graphics
 from matplotlib.ticker import EngFormatter
+
+from .utils import RetrievalResultStandin
 
 
 class PlotXAxis(str, enum.Enum):
@@ -22,16 +24,16 @@ class PlotYAxis(str, enum.Enum):
 
 
 def plot_complex_phase(
-    x,
-    y,
-    ax,
-    ax2,
-    yaxis="intensity",
-    limit=False,
-    phase_blanking=False,
-    phase_blanking_threshold=1e-3,
-    amplitude_line="r-",
-    phase_line="b-",
+    x: np.ndarray,
+    y: np.ndarray,
+    ax: plt.Axes,
+    ax2: plt.Axes,
+    yaxis: PlotYAxis = PlotYAxis.intensity,
+    limit: bool = False,
+    phase_blanking: bool = False,
+    phase_blanking_threshold: float = 1e-3,
+    amplitude_line: str = "r-",
+    phase_line: str = "b-",
 ):
     if yaxis == "intensity":
         amp = pypret.lib.abs2(y)
@@ -67,12 +69,12 @@ def plot_complex_phase(
 
 @dataclasses.dataclass
 class RetrievalResultPlot:
-    retrieval_result: Any
-    retrieval_parameter: Any
-    fund_range: Any
-    scan_range: Any
-    final_position: Any
-    scan_positions: Any
+    retrieval_result: RetrievalResultStandin
+    retrieval_parameter: float
+    fund_range: Tuple[float, float]
+    scan_range: Tuple[float, float]
+    final_position: float
+    scan_positions: np.ndarray
     fourier_transform_limit: float
     fundamental: Optional[np.ndarray] = None
     fundamental_wavelength: Optional[np.ndarray] = None
@@ -84,7 +86,7 @@ class RetrievalResultPlot:
         limit: bool = True,
         oversampling: int = 0,
         phase_blanking: bool = False,
-        phase_blanking_threshold=1e-3,
+        phase_blanking_threshold: float = 1e-3,
         show: bool = False,
     ):
         xaxis = PlotXAxis(xaxis)
@@ -190,7 +192,7 @@ class RetrievalResultPlot:
             spectrum2,
             ax2,
             ax22,
-            yaxis=yaxis,
+            yaxis=yaxis.value,
             phase_blanking=phase_blanking,
             limit=limit,
             phase_blanking_threshold=phase_blanking_threshold,
@@ -213,7 +215,7 @@ class RetrievalResultPlot:
         ftl = self.fourier_transform_limit * 1e15
         ax2.set_title(f"frequency domain (FTL = {ftl:.2f} fs)")
         ax2.set_xlabel(label)
-        ax2.set_ylabel(yaxis)
+        ax2.set_ylabel(yaxis.value)
         ax22.set_ylabel("phase (rad)")
         ax2.legend(lines, labels)
         ax2.set_xlim([self.fund_range[0] * 1e-9, self.fund_range[1] * 1e-9])

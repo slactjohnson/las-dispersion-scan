@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from typing import Optional, Tuple
 
 import numpy as np
@@ -64,3 +65,59 @@ def preprocess(
     # normalize
     trace.normalize()
     return trace
+
+
+class RetrievalOptionsStandin(SimpleNamespace):
+    """
+    The retriever returns a SimpleNamespace with ``.options`` matching these
+    attributes.
+
+    This class exists for type hinting purposes only.
+    """
+
+    alpha: float
+    maxfev: Optional[float]
+    maxiter: int
+
+
+class RetrievalResultStandin(SimpleNamespace):
+    """
+    The retriever returns a SimpleNamespace that contains (likely) all of
+    these attributes.
+
+    This class exists for type hinting purposes only.
+    """
+
+    parameter: np.ndarray
+    options: RetrievalOptionsStandin
+    logging: bool
+    measurement: pypret.MeshData
+    pnps: Optional[pypret.pnps.BasePNPS]
+    # the pulse spectra
+    # 1 - the retrieved pulse
+    pulse_retrieved: np.ndarray
+    # 2 - the original test pulse, optional
+    pulse_original: Optional[np.ndarray]
+    # 3 - the initial guess
+    pulse_initial: np.ndarray
+
+    # the measurement traces
+    # 1 - the original data used for retrieval
+    trace_input: np.ndarray
+    # 2 - the trace error and the trace calculated from the retrieved pulse
+    trace_error: float
+    trace_retrieved: np.ndarray
+    response_function: float
+    # the weights
+    weights: np.ndarray
+
+    # this is set if the original spectrum is provided
+    # the trace error of the test pulse (non-zero for noisy input)
+    trace_error_optimal: float
+    # 3 - the optimal trace calculated from the test pulse
+    trace_original: float
+    pulse_error: float
+    # the logged trace errors
+    trace_errors: np.ndarray
+    # the running minimum of the trace errors (for plotting)
+    rm_trace_errors: np.ndarray

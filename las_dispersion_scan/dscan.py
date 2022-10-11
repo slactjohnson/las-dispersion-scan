@@ -5,8 +5,7 @@ import dataclasses
 import enum
 import logging
 import os
-from types import SimpleNamespace
-from typing import Any, Optional, Tuple, cast
+from typing import Optional, Tuple, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,7 +15,7 @@ import scipy.interpolate
 from scipy.ndimage import gaussian_filter
 
 from .plotting import RetrievalResultPlot
-from .utils import get_pulse_spectrum, preprocess
+from .utils import RetrievalResultStandin, get_pulse_spectrum, preprocess
 
 logger = logging.getLogger(__name__)
 
@@ -76,49 +75,6 @@ class RetrieverSolver(str, enum.Enum):
     bfgs = "bfgs"
     de = "de"
     nelder_mead = "nelder-mead"
-
-
-class RetrievalResultStandin(SimpleNamespace):
-    """
-    The retriever returns a SimpleNamespace that contains (likely) all of
-    these attributes.
-
-    This class exists for type hinting purposes only.
-    """
-
-    parameter: Any
-    options: Any
-    logging: Any
-    measurement: Any
-    pnps: Optional[pypret.pnps.BasePNPS]
-    # the pulse spectra
-    # 1 - the retrieved pulse
-    pulse_retrieved: Any
-    # 2 - the original test pulse, optional
-    pulse_original: Any
-    # 3 - the initial guess
-    pulse_initial: Any
-
-    # the measurement traces
-    # 1 - the original data used for retrieval
-    trace_input: Any
-    # 2 - the trace error and the trace calculated from the retrieved pulse
-    trace_error: Any
-    trace_retrieved: Any
-    response_function: Any
-    # the weights
-    weights: np.ndarray
-
-    # this is set if the original spectrum is provided
-    # the trace error of the test pulse (non-zero for noisy input)
-    trace_error_optimal: float
-    # 3 - the optimal trace calculated from the test pulse
-    trace_original: float
-    pulse_error: float
-    # the logged trace errors
-    trace_errors: np.ndarray
-    # the running minimum of the trace errors (for plotting)
-    rm_trace_errors: np.ndarray
 
 
 def get_fundamental_spectrum(
