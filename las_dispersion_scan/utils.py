@@ -7,8 +7,14 @@ import scipy
 import scipy.interpolate
 
 
-def pulse_from_spectrum(wavelength, spectrum, pulse):
-    """Generates a pulse instance from a measured spectrum."""
+def get_pulse_spectrum(
+    wavelength: np.ndarray, spectrum: np.ndarray, pulse: pypret.Pulse
+) -> np.ndarray:
+    """
+    From a measured spectrum, generate the pypret.Pulse spectrum.
+
+    Modifies ``pulse.spectrum`` in-place.
+    """
     # scale to intensity over frequency, convert to amplitude and normalize
     # spectrum = spectrum * wavelength * wavelength
     spectrum[spectrum < 0.0] = 0.0
@@ -16,17 +22,35 @@ def pulse_from_spectrum(wavelength, spectrum, pulse):
     spectrum /= spectrum.max()
     # calculate angular frequencies
     w = pypret.frequencies.convert(wavelength, "wl", "om")
-    pulse.spectrum = scipy.interpolate.interp1d(
+    return scipy.interpolate.interp1d(
         w - pulse.w0, spectrum, bounds_error=False, fill_value=0.0
     )(pulse.w)
-    return pulse
 
 
 def preprocess(
     trace: pypret.MeshData,
     signal_range: Optional[Tuple[float, float]] = None,
     dark_signal_range: Optional[Tuple[float, float]] = None,
-):
+) -> pypret.MeshData:
+    """
+    Preprocess the mesh scan data.
+
+    Parameters
+    ----------
+    trace : pypret.MeshData
+        The mesh data, including scanned positions, wavelengths, and
+        intensities.
+    signal_range : Tuple[float, float], optional
+        The low/high range of the signal.
+    dark_signal_range : Tuple[float, float], optional
+        The low/high range of the dark signal.
+
+    Returns
+    -------
+    pypret.MeshData
+        A new instance of pre-processed mesh data.
+    """
+    trace = trace.copy()
     dark_signal = None
     if dark_signal_range is not None:
         dark_signal = trace.copy()
@@ -40,18 +64,3 @@ def preprocess(
     # normalize
     trace.normalize()
     return trace
-
-
-def preprocess2(
-    trace: pypret.MeshData,
-    pnps: pypret.pnps.BasePNPS,
-):
-    if trace.units[1] == "m":
-        # scaled in wavelength -> has to be corrected
-        wavelength = trace.axes[1]
-        frequency = pypret.frequencies.convert(wavelength, "wl", "om")
-        trace.scale(wavelength * wavelength)
-        trace.normalize()
-        trace.axes[1] = frequency
-        trace.units[1] = "Hz"
-    trace.interpolate(axis2=pnps.process_w)
