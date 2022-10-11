@@ -82,7 +82,28 @@ def get_fundamental_spectrum(
     intensities: np.ndarray,
     range_low: float,
     range_high: float,
-):
+) -> np.ndarray:
+    """
+    Column-stack the wavelengths/intensities for the fundamental spectrum.
+
+    Parameters
+    ----------
+    wavelengths : np.ndarray
+        Fundamental wavelengths.
+    intensities : np.ndarray
+        Fundamental intensities.
+    range_low : float
+        Wavelength lower limit.
+    range_high : float
+        Wavelength upper limit.
+
+    Returns
+    -------
+    np.ndarray
+        Column-stacked wavelengths/intensities with the range applied.
+    """
+    assert wavelengths.shape == intensities.shape
+
     wavelength_fund = wavelengths[
         (wavelengths > range_low) & (wavelengths < range_high)
     ]
@@ -595,22 +616,23 @@ class PypretResult:
         )
         return md
 
-    def _calculate_fwhm_and_profile(self):
+    def _calculate_fwhm_and_profile(self) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Sets per-retrieval-parameter 'result_profile' and 'fwhm'.
+        Calculates per-retrieval-parameter 'result_profile' and 'fwhm'.
 
-        Side-effects:
-        1. Sets ``self.result_profile``
-        2. Sets ``self.fwhm``
+        Returns
+        -------
+        np.ndarray
+            The FWHM array.
+        np.ndarray
+            The result profile.
         """
         pulse = self.pulse
         assert pulse is not None
         assert self.retrieval.pnps is not None
         result_parameter_mid_idx = np.floor(len(pulse.field) / 2) + 1
-        self.result_profile = np.zeros(
-            (len(pulse.field), len(self.retrieval.parameter))
-        )
-        self.fwhm = np.zeros((len(self.retrieval.parameter), 1))
+        result_profile = np.zeros((len(pulse.field), len(self.retrieval.parameter)))
+        fwhm = np.zeros((len(self.retrieval.parameter), 1))
         for idx, param in enumerate(self.retrieval.parameter):
             # Updating the spectrum property -> field gets updated
             pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
@@ -618,13 +640,15 @@ class PypretResult:
             )
             profile = np.power(np.abs(pulse.field), 2)[:]
             profile_max_idx = np.argmax(profile)
-            self.result_profile[:, idx] = np.roll(
+            result_profile[:, idx] = np.roll(
                 profile, -round(profile_max_idx - result_parameter_mid_idx)
             )
             try:
-                self.fwhm[idx] = pulse.fwhm(dt=pulse.dt / 100)
+                fwhm[idx] = pulse.fwhm(dt=pulse.dt / 100)
             except Exception:
-                self.fwhm[idx] = np.nan
+                fwhm[idx] = np.nan
+
+        return fwhm, result_profile
 
     @property
     def optimum_fwhm_idx(self) -> np.ndarray:
@@ -959,7 +983,7 @@ class PypretResult:
         logger.info(f"RMS spectrum error: {rms_error}")
 
         # Find position of smallest FWHM
-        result._calculate_fwhm_and_profile()
+        result.fwhm, result.result_profile = result._calculate_fwhm_and_profile()
         result.plot = result._get_retrieval_plot(result.plot_position)
 
         if verbose:
