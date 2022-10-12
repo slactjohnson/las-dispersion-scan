@@ -27,7 +27,7 @@
        </size>
       </property>
       <layout class="QGridLayout" name="gridLayout_3">
-       <item row="21" column="1">
+       <item row="24" column="1">
         <widget class="QLabel" name="plot_settings_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
@@ -49,7 +49,7 @@
          </property>
         </widget>
        </item>
-       <item row="27" column="1">
+       <item row="31" column="1">
         <spacer name="left_spacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
@@ -62,10 +62,10 @@
          </property>
         </spacer>
        </item>
-       <item row="19" column="1" colspan="2">
+       <item row="22" column="1" colspan="2">
         <widget class="SolverComboBox" name="solver_combo"/>
        </item>
-       <item row="17" column="0">
+       <item row="20" column="0">
         <widget class="QLabel" name="nonlinear_process_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -85,7 +85,7 @@
          </property>
         </widget>
        </item>
-       <item row="16" column="0">
+       <item row="19" column="0">
         <widget class="QLabel" name="material_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -105,10 +105,10 @@
          </property>
         </widget>
        </item>
-       <item row="16" column="1" colspan="2">
+       <item row="19" column="1" colspan="2">
         <widget class="MaterialComboBox" name="material_combo"/>
        </item>
-       <item row="1" column="1">
+       <item row="3" column="1">
         <widget class="QDoubleSpinBox" name="scan_start_spinbox">
          <property name="suffix">
           <string> mm</string>
@@ -127,7 +127,7 @@
          </property>
         </widget>
        </item>
-       <item row="25" column="1" colspan="2">
+       <item row="28" column="1" colspan="2">
         <widget class="QDoubleSpinBox" name="phase_blanking_threshold_spinbox">
          <property name="suffix">
           <string> </string>
@@ -146,7 +146,7 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
+       <item row="5" column="1">
         <widget class="QSpinBox" name="scan_steps_spinbox">
          <property name="minimum">
           <number>5</number>
@@ -156,7 +156,7 @@
          </property>
         </widget>
        </item>
-       <item row="20" column="2">
+       <item row="23" column="2">
         <widget class="QPushButton" name="export_button">
          <property name="toolTip">
           <string>Export data to a file</string>
@@ -166,10 +166,20 @@
          </property>
         </widget>
        </item>
-       <item row="18" column="1" colspan="2">
+       <item row="30" column="2">
+        <widget class="QPushButton" name="replot_button">
+         <property name="toolTip">
+          <string>Export data to a file</string>
+         </property>
+         <property name="text">
+          <string>Replot</string>
+         </property>
+        </widget>
+       </item>
+       <item row="21" column="1" colspan="2">
         <widget class="PulseAnalysisComboBox" name="pulse_analysis_combo"/>
        </item>
-       <item row="23" column="1" colspan="2">
+       <item row="26" column="1" colspan="2">
         <widget class="QSpinBox" name="oversampling_spinbox">
          <property name="minimum">
           <number>0</number>
@@ -182,7 +192,7 @@
          </property>
         </widget>
        </item>
-       <item row="7" column="0" colspan="3">
+       <item row="10" column="0" colspan="3">
         <widget class="QLabel" name="scan_status_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
@@ -195,7 +205,7 @@
          </property>
         </widget>
        </item>
-       <item row="3" column="0">
+       <item row="5" column="0">
         <widget class="QLabel" name="scan_steps_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -211,7 +221,7 @@
          </property>
         </widget>
        </item>
-       <item row="18" column="0">
+       <item row="21" column="0">
         <widget class="QLabel" name="pulse_analysis_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -231,7 +241,7 @@
          </property>
         </widget>
        </item>
-       <item row="2" column="1">
+       <item row="4" column="1">
         <widget class="QDoubleSpinBox" name="scan_wavelength_low_spinbox">
          <property name="suffix">
           <string> nm</string>
@@ -250,14 +260,30 @@
          </property>
         </widget>
        </item>
-       <item row="11" column="1" colspan="2">
+       <item row="1" column="0">
+        <widget class="QLabel" name="stage_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Stage</string>
+         </property>
+         <property name="buddy">
+          <cstring>stage_suite_button</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="1" colspan="2">
         <widget class="QSpinBox" name="blur_sigma_spinbox">
          <property name="suffix">
           <string> stdev</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="0">
+       <item row="3" column="0">
         <widget class="QLabel" name="start_pos_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -273,7 +299,7 @@
          </property>
         </widget>
        </item>
-       <item row="13" column="0">
+       <item row="16" column="0">
         <widget class="QLabel" name="iterations_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -292,7 +318,7 @@
          </property>
         </widget>
        </item>
-       <item row="24" column="0">
+       <item row="27" column="0">
         <widget class="QLabel" name="phase_blanking_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -307,11 +333,11 @@
           <string>Phase blanking</string>
          </property>
          <property name="buddy">
-          <cstring>iterations_spinbox</cstring>
+          <cstring>phase_blanking_checkbox</cstring>
          </property>
         </widget>
        </item>
-       <item row="24" column="1">
+       <item row="27" column="1">
         <widget class="QCheckBox" name="phase_blanking_checkbox">
          <property name="text">
           <string/>
@@ -321,7 +347,7 @@
          </property>
         </widget>
        </item>
-       <item row="25" column="0">
+       <item row="28" column="0">
         <widget class="QLabel" name="phase_blanking_threshold_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -336,11 +362,11 @@
           <string>Threshold</string>
          </property>
          <property name="buddy">
-          <cstring>iterations_spinbox</cstring>
+          <cstring>phase_blanking_threshold_spinbox</cstring>
          </property>
         </widget>
        </item>
-       <item row="22" column="1">
+       <item row="25" column="1">
         <widget class="QCheckBox" name="apply_limit_checkbox">
          <property name="text">
           <string/>
@@ -350,7 +376,7 @@
          </property>
         </widget>
        </item>
-       <item row="20" column="1">
+       <item row="23" column="1">
         <widget class="QPushButton" name="import_button">
          <property name="toolTip">
           <string>Import data from previous scans</string>
@@ -360,7 +386,7 @@
          </property>
         </widget>
        </item>
-       <item row="14" column="1">
+       <item row="17" column="1">
         <widget class="QDoubleSpinBox" name="fundamental_low_spinbox">
          <property name="suffix">
           <string> nm</string>
@@ -379,7 +405,26 @@
          </property>
         </widget>
        </item>
-       <item row="10" column="0">
+       <item row="6" column="1">
+        <widget class="QDoubleSpinBox" name="dwell_time_spinbox">
+         <property name="suffix">
+          <string> sec</string>
+         </property>
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.100000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="0">
         <widget class="QLabel" name="wedge_angle_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -399,7 +444,7 @@
          </property>
         </widget>
        </item>
-       <item row="15" column="0">
+       <item row="18" column="0">
         <widget class="QLabel" name="center_banwidth_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -418,7 +463,7 @@
          </property>
         </widget>
        </item>
-       <item row="12" column="0">
+       <item row="15" column="0">
         <widget class="QLabel" name="grid_points_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -438,10 +483,26 @@
          </property>
         </widget>
        </item>
-       <item row="17" column="1" colspan="2">
+       <item row="2" column="0">
+        <widget class="QLabel" name="spectrometer_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Spectrometer</string>
+         </property>
+         <property name="buddy">
+          <cstring>spectrometer_suite_button</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="20" column="1" colspan="2">
         <widget class="NonlinearComboBox" name="nonlinear_combo"/>
        </item>
-       <item row="2" column="0">
+       <item row="4" column="0">
         <widget class="QLabel" name="scan_wavelength_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -457,7 +518,7 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="2">
+       <item row="3" column="2">
         <widget class="QDoubleSpinBox" name="scan_end_spinbox">
          <property name="suffix">
           <string> mm</string>
@@ -476,7 +537,7 @@
          </property>
         </widget>
        </item>
-       <item row="5" column="1">
+       <item row="8" column="1">
         <widget class="QPushButton" name="scan_button">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
@@ -489,7 +550,7 @@
          </property>
         </widget>
        </item>
-       <item row="10" column="1" colspan="2">
+       <item row="13" column="1" colspan="2">
         <widget class="QDoubleSpinBox" name="wedge_angle_spin">
          <property name="suffix">
           <string> deg</string>
@@ -508,7 +569,7 @@
          </property>
         </widget>
        </item>
-       <item row="19" column="0">
+       <item row="22" column="0">
         <widget class="QLabel" name="solver_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -527,7 +588,17 @@
          </property>
         </widget>
        </item>
-       <item row="14" column="0">
+       <item row="2" column="1">
+        <widget class="TyphosRelatedSuiteButton" name="spectrometer_suite_button">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="text">
+          <string>spectrometer_name</string>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="0">
         <widget class="QLabel" name="fundamental_range_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -546,7 +617,23 @@
          </property>
         </widget>
        </item>
-       <item row="11" column="0">
+       <item row="6" column="0">
+        <widget class="QLabel" name="dwell_time_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Dwell time</string>
+         </property>
+         <property name="buddy">
+          <cstring>scan_wavelength_low_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="0">
         <widget class="QLabel" name="blur_sigma_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -566,7 +653,7 @@
          </property>
         </widget>
        </item>
-       <item row="23" column="0">
+       <item row="26" column="0">
         <widget class="QLabel" name="oversampling_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -581,7 +668,17 @@
           <string>Oversampling</string>
          </property>
          <property name="buddy">
-          <cstring>iterations_spinbox</cstring>
+          <cstring>oversampling_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="TyphosRelatedSuiteButton" name="stage_suite_button">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="text">
+          <string>stage_name</string>
          </property>
         </widget>
        </item>
@@ -607,7 +704,7 @@
          </property>
         </widget>
        </item>
-       <item row="22" column="0">
+       <item row="25" column="0">
         <widget class="QLabel" name="apply_limit_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -623,11 +720,11 @@
           <string>Apply limit</string>
          </property>
          <property name="buddy">
-          <cstring>iterations_spinbox</cstring>
+          <cstring>apply_limit_checkbox</cstring>
          </property>
         </widget>
        </item>
-       <item row="12" column="1" colspan="2">
+       <item row="15" column="1" colspan="2">
         <widget class="QSpinBox" name="num_grid_points_spinbox">
          <property name="minimum">
           <number>10</number>
@@ -640,7 +737,7 @@
          </property>
         </widget>
        </item>
-       <item row="14" column="2">
+       <item row="17" column="2">
         <widget class="QDoubleSpinBox" name="fundamental_high_spinbox">
          <property name="suffix">
           <string> nm</string>
@@ -659,7 +756,7 @@
          </property>
         </widget>
        </item>
-       <item row="2" column="2">
+       <item row="4" column="2">
         <widget class="QDoubleSpinBox" name="scan_wavelength_high_spinbox">
          <property name="suffix">
           <string> nm</string>
@@ -678,7 +775,7 @@
          </property>
         </widget>
        </item>
-       <item row="9" column="0" colspan="3">
+       <item row="12" column="0" colspan="3">
         <widget class="QLabel" name="retriever_settings_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
@@ -700,7 +797,7 @@
          </property>
         </widget>
        </item>
-       <item row="13" column="1" colspan="2">
+       <item row="16" column="1" colspan="2">
         <widget class="QSpinBox" name="iterations_spinbox">
          <property name="minimum">
           <number>1</number>
@@ -713,7 +810,7 @@
          </property>
         </widget>
        </item>
-       <item row="15" column="1" colspan="2">
+       <item row="18" column="1" colspan="2">
         <widget class="QDoubleSpinBox" name="freq_bandwidth_spinbox">
          <property name="suffix">
           <string> nm</string>
@@ -728,17 +825,53 @@
           <double>100000.000000000000000</double>
          </property>
          <property name="value">
-          <double>400.000000000000000</double>
+          <double>950.000000000000000</double>
          </property>
         </widget>
        </item>
-       <item row="26" column="2">
-        <widget class="QPushButton" name="replot_button">
+       <item row="29" column="0">
+        <widget class="QLabel" name="debug_mode_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
          <property name="toolTip">
-          <string>Export data to a file</string>
+          <string>Phase blanking threshold</string>
          </property>
          <property name="text">
-          <string>Replot</string>
+          <string>Debug mode</string>
+         </property>
+         <property name="buddy">
+          <cstring>debug_mode_checkbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="29" column="1">
+        <widget class="QCheckBox" name="debug_mode_checkbox">
+         <property name="toolTip">
+          <string>Show all available debug plots in separate windows after pulse retrieval</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="PyDMLabel" name="stage_status_label">
+         <property name="toolTip">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="PyDMLabel" name="spectrometer_status_label">
+         <property name="toolTip">
+          <string/>
          </property>
         </widget>
        </item>
@@ -903,6 +1036,9 @@
            <property name="text">
             <string>Calculated pulse length:</string>
            </property>
+           <property name="buddy">
+            <cstring>pulse_length_lineedit</cstring>
+           </property>
           </widget>
          </item>
          <item>
@@ -944,6 +1080,16 @@
  </widget>
  <customwidgets>
   <customwidget>
+   <class>PyDMLabel</class>
+   <extends>QLabel</extends>
+   <header>pydm.widgets.label</header>
+  </customwidget>
+  <customwidget>
+   <class>TyphosRelatedSuiteButton</class>
+   <extends>QPushButton</extends>
+   <header>typhos.related_display</header>
+  </customwidget>
+  <customwidget>
    <class>PlotWidget</class>
    <extends>QWidget</extends>
    <header>las_dispersion_scan.widgets</header>
@@ -971,11 +1117,14 @@
   </customwidget>
  </customwidgets>
  <tabstops>
+  <tabstop>stage_suite_button</tabstop>
+  <tabstop>spectrometer_suite_button</tabstop>
   <tabstop>scan_start_spinbox</tabstop>
   <tabstop>scan_end_spinbox</tabstop>
   <tabstop>scan_wavelength_low_spinbox</tabstop>
   <tabstop>scan_wavelength_high_spinbox</tabstop>
   <tabstop>scan_steps_spinbox</tabstop>
+  <tabstop>dwell_time_spinbox</tabstop>
   <tabstop>scan_button</tabstop>
   <tabstop>wedge_angle_spin</tabstop>
   <tabstop>blur_sigma_spinbox</tabstop>
@@ -990,6 +1139,19 @@
   <tabstop>solver_combo</tabstop>
   <tabstop>import_button</tabstop>
   <tabstop>export_button</tabstop>
+  <tabstop>apply_limit_checkbox</tabstop>
+  <tabstop>oversampling_spinbox</tabstop>
+  <tabstop>phase_blanking_checkbox</tabstop>
+  <tabstop>phase_blanking_threshold_spinbox</tabstop>
+  <tabstop>debug_mode_checkbox</tabstop>
+  <tabstop>acquired_radio</tabstop>
+  <tabstop>retrieved_radio</tabstop>
+  <tabstop>difference_radio</tabstop>
+  <tabstop>time_radio</tabstop>
+  <tabstop>frequency_radio</tabstop>
+  <tabstop>replot_button</tabstop>
+  <tabstop>pulse_length_lineedit</tabstop>
+  <tabstop>update_button</tabstop>
  </tabstops>
  <resources/>
  <connections/>

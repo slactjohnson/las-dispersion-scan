@@ -1065,18 +1065,10 @@ class PypretResult:
             return self.scan.positions[self.optimum_fwhm_idx]
         return self.plot_position
 
-    def _get_retrieval_plot(
-        self, plot_position: Optional[float] = None
-    ) -> RetrievalResultPlot:
+    def _get_retrieval_plot(self) -> RetrievalResultPlot:
         """
         Get the "full" retrieval plot, with all pertinent information in one
         nice overview.
-
-        Parameters
-        ----------
-        plot_position : float or None, optional
-            Grating stage position for pypret plot OR glass insertion stage
-            position (mm, use None for shortest duration)
 
         Returns
         -------
@@ -1239,22 +1231,51 @@ class PypretResult:
 
         # Find position of smallest FWHM
         result.fwhm, result.result_profile = result._calculate_fwhm_and_profile()
-        result.plot = result._get_retrieval_plot(result.plot_position)
+        result.plot = result._get_retrieval_plot()
 
         if verbose:
-            result.fund.plot(result.pulse)
-            result.plot_mesh_data()
-            result.plot_fwhm_vs_grating_position()
-            result.plot_temporal_profile_vs_grating_position()
-            result.plot.plot(
-                oversampling=8,
-                phase_blanking=True,
-                phase_blanking_threshold=0.01,
-                limit=True,
-            )
-            plt.show()
+            result.plot_all_debug()
 
         return result
+
+    def plot_all_debug(
+        self,
+        limit: bool = True,
+        oversampling: int = 8,
+        phase_blanking: bool = True,
+        phase_blanking_threshold: float = 1e-3,
+        show: bool = True,
+    ) -> None:
+        """
+        Plot the retrieval result in the time domain.
+
+        Parameters
+        ----------
+        limit : bool, optional
+            Determine and apply a limit using pypret.
+        oversampling : int, optional
+            Oversampling count
+        phase_blanking : bool, optional
+            Enable phase blanking with pypret masking.
+        phase_blanking_threshold : float, optional
+            Phase blanking threshold.
+        show : bool, optional
+            Show the plots.
+        """
+
+        self.fund.plot(self.pulse)
+        self.plot_mesh_data()
+        self.plot_fwhm_vs_grating_position()
+        self.plot_temporal_profile_vs_grating_position()
+        if self.plot is not None:
+            self.plot.plot(
+                oversampling=oversampling,
+                phase_blanking=phase_blanking,
+                phase_blanking_threshold=phase_blanking_threshold,
+                limit=limit,
+            )
+        if show:
+            plt.show()
 
 
 @dataclasses.dataclass

@@ -3,11 +3,15 @@ import pathlib
 from typing import Any, ClassVar, Dict, Optional, Protocol, Type, Union
 
 import matplotlib.figure
+import pydm.widgets
+import typhos.related_display
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from qtpy import QtWidgets
 from qtpy.uic import loadUiType
 
-from . import dscan, options, plotting, utils
+from . import dscan
+from . import loader as device_loader
+from . import options, plotting, utils
 
 
 class _UiForm(Protocol):
@@ -103,7 +107,11 @@ class SolverComboBox(EnumComboBox):
 
 class PlotWidget(FigureCanvasQTAgg):
     def __init__(
-        self, parent: Optional[QtWidgets.QWidget] = None, width=5, height=4, dpi=100
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        width: int = 4,
+        height: int = 4,
+        dpi: int = 100,
     ):
         fig = matplotlib.figure.Figure(figsize=(width, height), dpi=dpi)
         # self.axes = fig.add_subplot(111)
@@ -121,15 +129,22 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     filename: ClassVar[str] = "main.ui"
 
     # UI-derived widgets:
+    acquired_or_retrieved_frame: QtWidgets.QFrame
+    acquired_radio: QtWidgets.QRadioButton
     apply_limit_checkbox: QtWidgets.QCheckBox
     apply_limit_label: QtWidgets.QLabel
     blur_sigma_label: QtWidgets.QLabel
     blur_sigma_spinbox: QtWidgets.QSpinBox
     calculated_pulse_length_label: QtWidgets.QLabel
     center_banwidth_label: QtWidgets.QLabel
+    debug_mode_checkbox: QtWidgets.QCheckBox
+    debug_mode_label: QtWidgets.QLabel
+    difference_radio: QtWidgets.QRadioButton
     dscan_acquired_plot: PlotWidget
     dscan_difference_plot: PlotWidget
     dscan_retrieved_plot: PlotWidget
+    dwell_time_label: QtWidgets.QLabel
+    dwell_time_spinbox: QtWidgets.QDoubleSpinBox
     export_button: QtWidgets.QPushButton
     freq_bandwidth_spinbox: QtWidgets.QDoubleSpinBox
     frequency_radio: QtWidgets.QRadioButton
@@ -160,9 +175,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     pulse_layout: QtWidgets.QHBoxLayout
     pulse_length_lineedit: QtWidgets.QLineEdit
     reconstruct_label: QtWidgets.QLabel
-    reconstructed_time_plot: PlotWidget
     reconstructed_frequency_plot: PlotWidget
+    reconstructed_time_plot: PlotWidget
     replot_button: QtWidgets.QPushButton
+    retrieved_radio: QtWidgets.QRadioButton
     retriever_settings_label: QtWidgets.QLabel
     right_frame: QtWidgets.QFrame
     scan_button: QtWidgets.QPushButton
@@ -176,24 +192,39 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     scan_wavelength_low_spinbox: QtWidgets.QDoubleSpinBox
     solver_combo: SolverComboBox
     solver_label: QtWidgets.QLabel
+    spectrometer_label: QtWidgets.QLabel
+    spectrometer_status_label: pydm.widgets.label.PyDMLabel
+    spectrometer_suite_button: typhos.related_display.TyphosRelatedSuiteButton
     splitter: QtWidgets.QSplitter
+    stage_label: QtWidgets.QLabel
+    stage_status_label: pydm.widgets.label.PyDMLabel
+    stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
     start_pos_label: QtWidgets.QLabel
     time_frequency_frame: QtWidgets.QHBoxLayout
+    time_frequency_frame_2: QtWidgets.QHBoxLayout
     time_or_frequency_frame: QtWidgets.QFrame
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
     wedge_angle_label: QtWidgets.QLabel
     wedge_angle_spin: QtWidgets.QDoubleSpinBox
-    acquired_radio: QtWidgets.QRadioButton
-    difference_radio: QtWidgets.QRadioButton
-    retrieved_radio: QtWidgets.QRadioButton
 
     data: Optional[dscan.Acquisition]
     result: Optional[dscan.PypretResult]
+    loader: device_loader.Loader
+    devices: device_loader.Devices
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        loader: Optional[device_loader.Loader] = None,
+    ):
         super().__init__(parent=parent)
 
+        self.loader = loader
+        if loader is not None:
+            self.devices = loader.load()
+        else:
+            self.devices = None
         self.show_type_hints()
         self.result = None
         self.data = None
@@ -234,42 +265,45 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if self.result is None:
             return
 
-        for widget in [
+        widgets = [
             self.reconstructed_time_plot,
             self.reconstructed_frequency_plot,
             self.dscan_acquired_plot,
             self.dscan_difference_plot,
             self.dscan_retrieved_plot,
-        ]:
+        ]
+
+        for widget in widgets:
             widget.figure.clear()
 
         self.result.plot_trace(
             fig=self.dscan_acquired_plot.figure,
             option=plotting.PlotTrace.measured,
         )
-        self.dscan_acquired_plot.draw()
 
         self.result.plot_trace(
             fig=self.dscan_retrieved_plot.figure,
             option=plotting.PlotTrace.retrieved,
         )
-        self.dscan_retrieved_plot.draw()
 
         self.result.plot_trace(
             fig=self.dscan_difference_plot.figure,
             option=plotting.PlotTrace.difference,
         )
-        self.dscan_difference_plot.draw()
 
         self.result.plot_frequency_domain_retrieval(
             fig=self.reconstructed_frequency_plot.figure, **self.plot_parameters
         )
-        self.reconstructed_frequency_plot.draw()
 
         self.result.plot_time_domain_retrieval(
             fig=self.reconstructed_time_plot.figure, **self.plot_parameters
         )
-        self.reconstructed_time_plot.draw()
+
+        if self.debug_mode_checkbox.isChecked():
+            self.result.plot_all_debug(**self.plot_parameters)
+
+        for widget in widgets:
+            widget.draw()
 
     @property
     def plot_parameters(self) -> Dict[str, Any]:
@@ -330,6 +364,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 self.scan_wavelength_high_spinbox.value(),
             ),
             plot_position=None,  # TODO
-            verbose=False,  # TODO
+            verbose=False,
             **acquisition,
         )

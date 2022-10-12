@@ -2,6 +2,7 @@ import pathlib
 from types import SimpleNamespace
 from typing import Optional, Tuple
 
+import happi
 import numpy as np
 import pypret
 import pypret.frequencies
@@ -124,3 +125,38 @@ class RetrievalResultStandin(SimpleNamespace):
     trace_errors: np.ndarray
     # the running minimum of the trace errors (for plotting)
     rm_trace_errors: np.ndarray
+
+
+_happi_client = None
+
+
+def get_happi_client() -> happi.Client:
+    """
+    Get the global happi client instance.
+
+    Returns
+    -------
+    happi.Client
+        The client instance.
+    """
+    global _happi_client
+    if _happi_client is None:
+        _happi_client = happi.Client.from_config()
+    return _happi_client
+
+
+def get_device_from_happi(name: str, client: Optional[happi.Client] = None) -> object:
+    """
+    Get an ophyd Device from happi.
+
+    Parameters
+    ----------
+    name : str
+        The device name.
+    client : happi.Client, optional
+        The happi client, if available.  Otherwise, determined from environment
+        settings.
+    """
+    if client is None:
+        client = get_happi_client()
+    return client[name].get()

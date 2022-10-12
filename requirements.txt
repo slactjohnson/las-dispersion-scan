@@ -1,6 +1,11 @@
 Pillow
 h5py
+happi
 matplotlib
 numpy
+ophyd
+pydm
 qtpy
 scipy
+typhos
+# pcdshub/pypret_custom
