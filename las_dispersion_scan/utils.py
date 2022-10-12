@@ -99,7 +99,7 @@ class RetrievalResultStandin(SimpleNamespace):
     options: RetrievalOptionsStandin
     logging: bool
     measurement: pypret.MeshData
-    pnps: Optional[pypret.pnps.BasePNPS]
+    pnps: pypret.pnps.BasePNPS
     # the pulse spectra
     # 1 - the retrieved pulse
     pulse_retrieved: np.ndarray

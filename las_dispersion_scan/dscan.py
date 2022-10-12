@@ -564,6 +564,15 @@ class PypretResult:
         )
         return md
 
+    @property
+    def pulse_width_fs(self) -> float:
+        """Get the reconstructed pulse width in femtoseconds."""
+        pulse = pypret.Pulse(self.retrieval.pnps.ft, self.retrieval.pnps.w0, unit="om")
+        pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
+            self._plot_param
+        )
+        return pulse.fwhm(dt=pulse.dt / 100) / 1e-15
+
     def plot_time_domain_retrieval(
         self,
         fig: Optional[plt.Figure] = None,
@@ -593,12 +602,15 @@ class PypretResult:
 
         Returns
         -------
-        Tuple[plt.Figure, plt.Axes, plt.Axes]
-
+        plt.Figure
+            The figure used.
+        plt.Axes
+            The left axis.
+        plt.Axes
+            The right axis.
         """
         assert self.plot is not None
         assert self.retrieval is not None
-        assert self.retrieval.pnps is not None
 
         # construct the figure
         if fig is None:
@@ -694,7 +706,6 @@ class PypretResult:
         """
         assert self.plot is not None
         assert self.retrieval is not None
-        assert self.retrieval.pnps is not None
 
         # construct the figure
         if fig is None:
@@ -800,7 +811,6 @@ class PypretResult:
         """
         assert self.plot is not None
         assert self.retrieval is not None
-        assert self.retrieval.pnps is not None
 
         # construct the figure
         if fig is None:
@@ -877,7 +887,6 @@ class PypretResult:
         """
         pulse = self.pulse
         assert pulse is not None
-        assert self.retrieval.pnps is not None
         result_parameter_mid_idx = np.floor(len(pulse.field) / 2) + 1
         result_profile = np.zeros((len(pulse.field), len(self.retrieval.parameter)))
         fwhm = np.zeros((len(self.retrieval.parameter), 1))
@@ -1051,7 +1060,7 @@ class PypretResult:
 
     @property
     def _plot_param(self) -> float:
-        """Plot parameter for RetrievalResultPlot"""
+        """Plot parameter for RetrievalResultPlot."""
         if self.plot_position is None:
             return self.retrieval.parameter[self.optimum_fwhm_idx]
         return self.retrieval.parameter[
@@ -1219,17 +1228,12 @@ class PypretResult:
         pypret.random_gaussian(
             result.pulse, result.fourier_transform_limit, phase_max=0.1
         )
-
-        # Experimental bimodal gaussian
-        # pypret.random_bigaussian(result.pulse, result.fourier_transform_limit, phase_max=0.1, sep)
         retriever.retrieve(result.trace, result.pulse.spectrum, weights=None)
         result.retrieval = cast(RetrievalResultStandin, retriever.result())
 
-        # Calculate the RMSE between retrieved and measured fundamental spectrum
         rms_error = result.get_rms_error()
         logger.info(f"RMS spectrum error: {rms_error}")
 
-        # Find position of smallest FWHM
         result.fwhm, result.result_profile = result._calculate_fwhm_and_profile()
         result.plot = result._get_retrieval_plot()
 

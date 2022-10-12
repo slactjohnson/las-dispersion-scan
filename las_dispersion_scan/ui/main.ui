@@ -177,7 +177,11 @@
         </widget>
        </item>
        <item row="21" column="1" colspan="2">
-        <widget class="PulseAnalysisComboBox" name="pulse_analysis_combo"/>
+        <widget class="PulseAnalysisComboBox" name="pulse_analysis_combo">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
        </item>
        <item row="26" column="1" colspan="2">
         <widget class="QSpinBox" name="oversampling_spinbox">
@@ -1034,7 +1038,7 @@
          <item>
           <widget class="QLabel" name="calculated_pulse_length_label">
            <property name="text">
-            <string>Calculated pulse length:</string>
+            <string>Calculated pulse length [fs]:</string>
            </property>
            <property name="buddy">
             <cstring>pulse_length_lineedit</cstring>

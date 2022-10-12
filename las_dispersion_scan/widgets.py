@@ -68,40 +68,36 @@ class DesignerDisplay:
 
 
 class EnumComboBox(QtWidgets.QComboBox):
-    enum_cls: ClassVar[Type[enum.Enum]]
     enum_default: ClassVar[enum.Enum]
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
-        for option in self.enum_cls:
+        for option in type(self.enum_default):
             self.addItem(option.value)
 
-        self.setCurrentIndex(list(self.enum_cls).index(self.enum_default))
+        self._enum_cls = type(self.enum_default)
+        self.setCurrentIndex(list(self._enum_cls).index(self.enum_default))
 
     @property
     def current_enum_value(self) -> enum.Enum:
         """The currently-selected enum value."""
         index = self.currentIndex()
-        return list(self.enum_cls)[index]
+        return list(self._enum_cls)[index]
 
 
 class MaterialComboBox(EnumComboBox):
-    enum_cls = options.Material
     enum_default = options.Material.bk7
 
 
 class NonlinearComboBox(EnumComboBox):
-    enum_cls = options.NonlinearProcess
     enum_default = options.NonlinearProcess.shg
 
 
 class PulseAnalysisComboBox(EnumComboBox):
-    enum_cls = options.PulseAnalysisMethod
     enum_default = options.PulseAnalysisMethod.dscan
 
 
 class SolverComboBox(EnumComboBox):
-    enum_cls = options.RetrieverSolver
     enum_default = options.RetrieverSolver.copra
 
 
@@ -273,18 +269,26 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.dscan_retrieved_plot.setVisible(self.retrieved_radio.isChecked())
 
     def load_path(self, path: Union[str, pathlib.Path]):
+        """
+        Load data from the provided path.
+
+        Filenames matching the supported data formats are searched in order of
+        "new" (.dat) to "old" (.txt).
+        """
         path = pathlib.Path(path).resolve()
         self.data = dscan.Acquisition.from_path(str(path))
 
-    def _run_retrieval(self):
+    def _run_retrieval(self) -> None:
+        """Run the pulse retrieval process and update the plots."""
         if self.data is None:
             raise ValueError("Data not acquired or loaded; cannot run retrieval")
 
         self.result = dscan.PypretResult.from_data(**self.retrieval_parameters)
-
+        self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
         self._update_plots()
 
-    def _update_plots(self):
+    def _update_plots(self) -> None:
+        """Update all of the plots based on the results from pypret."""
         if self.result is None:
             return
 
@@ -365,7 +369,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         ):
             self.scan_wavelength_low_spinbox.setFocus()
             raise ValueError(
-                "The low fundamental wavelength must be less than the high fundamental "
+                "The low scan wavelength must be less than the high scan wavelength "
                 "value."
             )
 

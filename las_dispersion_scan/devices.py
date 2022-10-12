@@ -58,17 +58,18 @@ class Spectrometer(ophyd.Device):
         ...
 
 
-FakeDScanStatus = cast(Type[DscanStatus], make_fake_device(DscanStatus))
-FakeMotor = cast(Type[Stage], make_fake_device(Stage))
-FakeSpectrometer = cast(Type[Spectrometer], make_fake_device(Spectrometer))
-
-
 class Qmini(qmini.QminiSpectrometer):
     start_acquisition = Cpt(Signal, doc="(No-op signal)")
-    # Markers that these components exist in the superclass. We can customize
+    # Markers that these components exist in the superclass. We could customize
     # them here:
+    status = UCpt()
     spectrum = UCpt()
     wavelengths = UCpt()
 
     def stop(self):
         ...
+
+
+FakeDScanStatus = cast(Type[DscanStatus], make_fake_device(DscanStatus))
+FakeMotor = cast(Type[Stage], make_fake_device(Stage))
+FakeSpectrometer = cast(Type[Spectrometer], make_fake_device(Spectrometer))
