@@ -3,43 +3,23 @@ import logging
 import sys
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Optional, Type, cast
+from typing import List, Optional, Type, cast
 
 import happi
 import ophyd
-from ophyd import Component as Cpt
-from ophyd import EpicsSignal
-from ophyd.sim import make_fake_device
+import ophyd.sim
 
+from . import devices
 from .utils import get_device_from_happi
 
 logger = logging.getLogger(__name__)
 
 
-class DscanStatus(ophyd.Device, ophyd.PositionerBase):
-    scan_start = Cpt(EpicsSignal, "Scan:Start")
-    scan_stop = Cpt(EpicsSignal, "Scan:Stop")
-    scan_steps = Cpt(EpicsSignal, "Scan:Steps")
-
-
-class Motor(ophyd.Device, ophyd.PositionerBase):
-    ...
-
-
-class Spectrometer(ophyd.Device):
-    ...
-
-
-FakeDScanStatus = cast(Type[DscanStatus], make_fake_device(DscanStatus))
-FakeMotor = cast(Type[Motor], make_fake_device(Motor))
-FakeSpectrometer = cast(Type[Spectrometer], make_fake_device(Spectrometer))
-
-
 @dataclass
 class Devices:
-    status: DscanStatus
-    motor: Motor
-    spectrometer: Spectrometer
+    status: devices.DscanStatus
+    stage: devices.Stage
+    spectrometer: devices.Spectrometer
 
 
 def import_module(module_name: str) -> ModuleType:
@@ -67,6 +47,45 @@ def import_module(module_name: str) -> ModuleType:
         return importlib.import_module(module_name)
 
 
+def check_device_against_interface(
+    device: ophyd.Device,
+    interface: Type[ophyd.Device],
+    attrs: List[str],
+):
+    """
+    Check a device instance against a device class that defines an interface.
+
+    Requires that all components of the interface be included in the device.
+    Requires that all ``attrs`` provided exist on the device.
+    Does not recurse to sub-devices.
+
+    Parameters
+    ----------
+    device : ophyd.Device
+        The device instance.
+    interface : Type[ophyd.Device]
+        The interface.
+    attrs : List[str]
+        Additional attributes required to exist.
+    """
+    cls = type(device)
+    missing_components = set(interface.component_names) - set(device.component_names)
+    description = f"Device {device.name} ({cls.__module__}{cls.__name__})"
+
+    if missing_components:
+        raise ValueError(
+            f"{description} is missing "
+            f"these required components: {missing_components}"
+        )
+
+    missing_attrs = [attr for attr in attrs if not hasattr(device, attr)]
+    if missing_attrs:
+        raise ValueError(
+            f"{description} is missing "
+            f"these required attributes or methods: {missing_attrs}"
+        )
+
+
 @dataclass
 class Loader:
     """
@@ -78,34 +97,44 @@ class Loader:
 
     #: Prefix of the status device.
     prefix: Optional[str] = None
-    #: An external script to run to define 'motor' and 'spectrometer'
+    #: An external script to run to define 'stage' and 'spectrometer'
     script: Optional[str] = None
-    #: An optional happi item name for the motor.
-    motor: Optional[str] = None
+    #: An optional happi item name for the stage.
+    stage: Optional[str] = None
     #: An optional happi item name for the spectrometer.
     spectrometer: Optional[str] = None
 
     def load(self, client: Optional[happi.Client] = None) -> Devices:
-        cls = DscanStatus if self.prefix else FakeDScanStatus
+        cls = devices.DscanStatus if self.prefix else devices.FakeDScanStatus
         status = cls(self.prefix or "", name="DscanStatus")
 
-        motor = FakeMotor("", name="no-motor")
-        spectrometer = FakeSpectrometer("", name="no-spectrometer")
+        stage = devices.FakeMotor("", name="no-motor")
+        spectrometer = devices.FakeSpectrometer("", name="no-spectrometer")
 
         if self.script is not None:
             module = import_module(self.script)
-            motor = getattr(module, "motor", motor)
+            stage = getattr(module, "stage", stage)
             spectrometer = getattr(module, "spectrometer", spectrometer)
 
-        if self.motor is not None:
-            motor = cast(Motor, get_device_from_happi(self.motor, client=client))
+        if self.stage is not None:
+            stage = cast(
+                devices.Stage, get_device_from_happi(self.stage, client=client)
+            )
         if self.spectrometer is not None:
             spectrometer = cast(
-                Spectrometer, get_device_from_happi(self.spectrometer, client=client)
+                devices.Spectrometer,
+                get_device_from_happi(self.spectrometer, client=client),
             )
 
-        return Devices(
+        result = Devices(
             status=status,
-            motor=motor,
+            stage=stage,
             spectrometer=spectrometer,
         )
+        self._check(result)
+        return result
+
+    def _check(self, dev: Devices):
+        check_device_against_interface(dev.stage, devices.Stage, attrs=["egu"])
+        check_device_against_interface(dev.spectrometer, devices.Spectrometer, attrs=[])
+        check_device_against_interface(dev.status, devices.DscanStatus, attrs=[])

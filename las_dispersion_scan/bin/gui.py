@@ -89,18 +89,18 @@ def build_arg_parser(argparser=None):
         "--script",
         type=str,
         help=(
-            "Script that defines the motor and spectrometer instances, if available. "
+            "Script that defines the stage and spectrometer instances, if available. "
             "This is a module name and not a path.  The usual Python import "
             "mechanism will be used. "
         ),
     )
 
     argparser.add_argument(
-        "--motor",
+        "--stage",
         type=str,
         help=(
-            "The motor name to load from happi.  "
-            "This overrides the motor loaded from the script, if specified."
+            "The stage name to load from happi.  "
+            "This overrides the stage loaded from the script, if specified."
         ),
     )
 
@@ -121,7 +121,7 @@ def main(
     stylesheet: Optional[str] = None,
     prefix: Optional[str] = None,
     script: Optional[str] = None,
-    motor: Optional[str] = None,
+    stage: Optional[str] = None,
     spectrometer: Optional[str] = None,
 ) -> None:
     """
@@ -136,10 +136,10 @@ def main(
     prefix : str, optional
         Prefix for the scan status PVs.
     script : str, optional
-        Script that defines the motor and spectrometer instances, if available.
+        Script that defines the stage and spectrometer instances, if available.
         This is a module name and not a path.  The usual Python import
         mechanism will be used.
-    motor : str, optional
+    stage : str, optional
         Motor name from the happi database.  Overrides the script-provided
         settings if specified.
     spectrometer : str, optional
@@ -173,7 +173,7 @@ def main(
 
     loader = Loader(
         script=script,
-        motor=motor,
+        stage=stage,
         spectrometer=spectrometer,
     )
     try:

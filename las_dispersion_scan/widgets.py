@@ -200,9 +200,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     stage_status_label: pydm.widgets.label.PyDMLabel
     stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
     start_pos_label: QtWidgets.QLabel
-    time_frequency_frame: QtWidgets.QHBoxLayout
-    time_frequency_frame_2: QtWidgets.QHBoxLayout
-    time_or_frequency_frame: QtWidgets.QFrame
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
     wedge_angle_label: QtWidgets.QLabel
@@ -225,6 +222,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             self.devices = loader.load()
         else:
             self.devices = None
+
         self.show_type_hints()
         self.result = None
         self.data = None
@@ -241,6 +239,31 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         ]:
             radio.clicked.connect(self._switch_plot)
         self._switch_plot()
+        self._connect_devices()
+
+    def _connect_devices(self) -> None:
+        if self.devices is None:
+            return
+
+        stage = self.devices.stage
+        spectrometer = self.devices.spectrometer
+        status = self.devices.status
+        self.stage_suite_button.setText(stage.name)
+        self.stage_suite_button.add_device(stage)
+
+        self.spectrometer_suite_button.setText(spectrometer.name)
+        self.spectrometer_suite_button.add_device(spectrometer)
+        self.setWindowTitle(f"D-scan Diagnostic ({status.prefix})")
+
+        readback = getattr(stage, "user_readback", None)
+        if readback is not None:
+            self.stage_status_label.channel = utils.channel_from_signal(readback)
+
+        spec_status = getattr(spectrometer, "status", None)
+        if spec_status is not None:
+            self.spectrometer_status_label.channel = utils.channel_from_signal(
+                spec_status
+            )
 
     def _switch_plot(self):
         self.reconstructed_time_plot.setVisible(self.time_radio.isChecked())
