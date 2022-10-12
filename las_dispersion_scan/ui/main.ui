@@ -769,13 +769,66 @@
         </widget>
        </item>
        <item>
-        <widget class="PlotWidget" name="dscan_plot" native="true">
+        <widget class="PlotWidget" name="dscan_difference_plot" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="PlotWidget" name="dscan_retrieved_plot" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="PlotWidget" name="dscan_acquired_plot" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="acquired_or_retrieved_frame">
+         <layout class="QHBoxLayout" name="time_frequency_frame_2">
+          <item>
+           <widget class="QRadioButton" name="acquired_radio">
+            <property name="text">
+             <string>Acquired</string>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="retrieved_radio">
+            <property name="text">
+             <string>Retrieved</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="difference_radio">
+            <property name="text">
+             <string>Difference</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
        </item>
        <item>

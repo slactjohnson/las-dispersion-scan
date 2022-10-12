@@ -778,6 +778,92 @@ class PypretResult:
         ax2.set_xlim([self.spec_fund_range[0] * 1e-9, self.spec_fund_range[1] * 1e-9])
         return fig, ax2, ax22
 
+    def plot_trace(
+        self,
+        fig: Optional[plt.Figure] = None,
+        option: plotting.PlotTrace = plotting.PlotTrace.retrieved,
+    ) -> Tuple[plt.Figure, plt.Axes]:
+        """
+        Plot the retrieval result in the time domain.
+
+        Parameters
+        ----------
+        fig : plt.Figure or None, optional
+            An optional figure to use for the plot.
+        option : plotting.PlotTrace, optional
+            The type of plot to create.
+
+        Returns
+        -------
+        plt.Figure
+        plt.Axes
+        """
+        assert self.plot is not None
+        assert self.retrieval is not None
+        assert self.retrieval.pnps is not None
+
+        # construct the figure
+        if fig is None:
+            fig = cast(plt.Figure, plt.figure())
+
+        ax = cast(plt.Axes, fig.subplots(nrows=1, ncols=1))
+        sc = 1.0 / self.retrieval.trace_input.max()
+
+        if option == plotting.PlotTrace.measured:
+            trace = self.retrieval.trace_input * sc
+            cmap = "nipy_spectral"
+            vmin = 0
+            vmax = 1
+            title = "Measured"
+        elif option == plotting.PlotTrace.retrieved:
+            trace = self.retrieval.trace_retrieved * sc
+            cmap = "nipy_spectral"
+            vmin = 0
+            vmax = 1
+            title = "Retrieved"
+        elif option == plotting.PlotTrace.difference:
+            diff = self.retrieval.trace_input - self.retrieval.trace_retrieved
+            trace = diff * self.retrieval.weights * sc
+            cmap = "RdBu"
+            vmin = "auto"
+            vmax = "auto"
+            title = "Difference"
+            if np.any(self.retrieval.weights != 1.0):
+                title = "Weighted difference"
+        else:
+            raise ValueError(f"Unsupported option: {option}")
+
+        md = self.retrieval.measurement
+        x, y = pypret.lib.edges(
+            self.retrieval.pnps.process_w / (2 * np.pi)
+        ), pypret.lib.edges(self.scan.positions)
+        if vmin == "auto":
+            vmin = -np.amax(abs(trace))
+        if vmax == "auto":
+            vmax = np.amax(abs(trace))
+
+        im = ax.pcolormesh(x, y, trace, cmap=cmap, vmin=vmin, vmax=vmax)
+        fig.colorbar(im, ax=ax)
+        # plt.xticks(fontsize=8)
+        # ax.set_xlabel(md.labels[1])
+        ax.set_xlabel("frequency")
+        if md.labels is not None:
+            ax.set_ylabel(md.labels[0])
+
+        if md.units is not None:
+            fx = EngFormatter(unit=md.units[1])
+            ax.xaxis.set_major_formatter(fx)
+            fy = EngFormatter(unit=md.units[0])
+            ax.yaxis.set_major_formatter(fy)
+
+        ax.set_title(title)
+        scan_padding = 75  # (nm)
+        ax.set_xlim(
+            2.99792 * 1e17 / (self.spec_scan_range[1] - scan_padding),
+            2.99792 * 1e17 / (self.spec_scan_range[0] + scan_padding),
+        )  # No factor of 2*pi
+        return fig, ax
+
     def _calculate_fwhm_and_profile(self) -> Tuple[np.ndarray, np.ndarray]:
         """
         Calculates per-retrieval-parameter 'result_profile' and 'fwhm'.

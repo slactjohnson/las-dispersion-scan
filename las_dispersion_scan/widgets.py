@@ -7,7 +7,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from qtpy import QtWidgets
 from qtpy.uic import loadUiType
 
-from . import dscan, options, utils
+from . import dscan, options, plotting, utils
 
 
 class _UiForm(Protocol):
@@ -127,7 +127,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     blur_sigma_spinbox: QtWidgets.QSpinBox
     calculated_pulse_length_label: QtWidgets.QLabel
     center_banwidth_label: QtWidgets.QLabel
-    dscan_plot: PlotWidget
+    dscan_acquired_plot: PlotWidget
+    dscan_difference_plot: PlotWidget
+    dscan_retrieved_plot: PlotWidget
     export_button: QtWidgets.QPushButton
     freq_bandwidth_spinbox: QtWidgets.QDoubleSpinBox
     frequency_radio: QtWidgets.QRadioButton
@@ -182,25 +184,39 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     update_button: QtWidgets.QPushButton
     wedge_angle_label: QtWidgets.QLabel
     wedge_angle_spin: QtWidgets.QDoubleSpinBox
+    acquired_radio: QtWidgets.QRadioButton
+    difference_radio: QtWidgets.QRadioButton
+    retrieved_radio: QtWidgets.QRadioButton
+
     data: Optional[dscan.Acquisition]
     result: Optional[dscan.PypretResult]
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
-        # self.show_type_hints()
+        self.show_type_hints()
         self.result = None
         self.data = None
         self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
         self.update_button.clicked.connect(self._run_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
-        self.reconstructed_frequency_plot.setVisible(False)
-        self.time_radio.clicked.connect(self._switch_plot)
-        self.frequency_radio.clicked.connect(self._switch_plot)
+
+        for radio in [
+            self.time_radio,
+            self.frequency_radio,
+            self.acquired_radio,
+            self.difference_radio,
+            self.retrieved_radio,
+        ]:
+            radio.clicked.connect(self._switch_plot)
+        self._switch_plot()
 
     def _switch_plot(self):
         self.reconstructed_time_plot.setVisible(self.time_radio.isChecked())
         self.reconstructed_frequency_plot.setVisible(self.frequency_radio.isChecked())
+        self.dscan_acquired_plot.setVisible(self.acquired_radio.isChecked())
+        self.dscan_difference_plot.setVisible(self.difference_radio.isChecked())
+        self.dscan_retrieved_plot.setVisible(self.retrieved_radio.isChecked())
 
     def load_path(self, path: Union[str, pathlib.Path]):
         path = pathlib.Path(path).resolve()
@@ -221,9 +237,29 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         for widget in [
             self.reconstructed_time_plot,
             self.reconstructed_frequency_plot,
-            self.dscan_plot,
+            self.dscan_acquired_plot,
+            self.dscan_difference_plot,
+            self.dscan_retrieved_plot,
         ]:
             widget.figure.clear()
+
+        self.result.plot_trace(
+            fig=self.dscan_acquired_plot.figure,
+            option=plotting.PlotTrace.measured,
+        )
+        self.dscan_acquired_plot.draw()
+
+        self.result.plot_trace(
+            fig=self.dscan_retrieved_plot.figure,
+            option=plotting.PlotTrace.retrieved,
+        )
+        self.dscan_retrieved_plot.draw()
+
+        self.result.plot_trace(
+            fig=self.dscan_difference_plot.figure,
+            option=plotting.PlotTrace.difference,
+        )
+        self.dscan_difference_plot.draw()
 
         self.result.plot_frequency_domain_retrieval(
             fig=self.reconstructed_frequency_plot.figure, **self.plot_parameters

@@ -13,6 +13,12 @@ from matplotlib.ticker import EngFormatter
 from .utils import RetrievalResultStandin
 
 
+class PlotTrace(str, enum.Enum):
+    measured = "measured"
+    retrieved = "retrieved"
+    difference = "difference"
+
+
 class PlotXAxis(str, enum.Enum):
     wavelength = "wavelength"
     frequency = "frequency"
