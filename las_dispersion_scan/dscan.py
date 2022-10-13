@@ -402,6 +402,32 @@ class ScanData:
         raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
 
 
+@dataclasses.dataclass
+class Acquisition:
+    fundamental: SpectrumData
+    scan: ScanData
+
+    @classmethod
+    def from_path(cls, path: Union[pathlib.Path, str]) -> Acquisition:
+        """
+        Load fundamental spectrum and scan data from a path.
+
+        Parameters
+        ----------
+        path : str
+            Directory where the old files are to be found.
+
+        Returns
+        -------
+        Acquisition
+            The data from the scan.
+        """
+        return cls(
+            fundamental=SpectrumData.from_path(path),
+            scan=ScanData.from_path(path),
+        )
+
+
 def _default_ndarray():
     """Helper for optional ndarray values in dataclass fields."""
     return np.zeros(0)
@@ -1116,7 +1142,6 @@ class PypretResult:
         material: Material,
         method: PulseAnalysisMethod,
         nlin_process: NonlinearProcess,
-        verbose: bool = True,
         wedge_angle: float = 8.0,
         blur_sigma: int = 0,
         num_grid_points: int = 3000,
@@ -1125,7 +1150,6 @@ class PypretResult:
         plot_position: Optional[float] = None,
         spec_fund_range: Tuple[float, float] = (400, 600),
         spec_scan_range: Tuple[float, float] = (200, 300),
-        callback: Optional[Callback] = None,
     ) -> PypretResult:
         """
         Generate a PypretResult based on a copy of the input parameters.
@@ -1299,29 +1323,3 @@ class PypretResult:
             )
         if show:
             plt.show()
-
-
-@dataclasses.dataclass
-class Acquisition:
-    fundamental: SpectrumData
-    scan: ScanData
-
-    @classmethod
-    def from_path(cls, path: Union[pathlib.Path, str]) -> Acquisition:
-        """
-        Load fundamental spectrum and scan data from a path.
-
-        Parameters
-        ----------
-        path : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        Acquisition
-            The data from the scan.
-        """
-        return cls(
-            fundamental=SpectrumData.from_path(path),
-            scan=ScanData.from_path(path),
-        )

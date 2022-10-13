@@ -469,6 +469,5 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 self.scan_wavelength_high_spinbox.value(),
             ),
             plot_position=None,  # TODO
-            verbose=False,
             **acquisition,
         )
