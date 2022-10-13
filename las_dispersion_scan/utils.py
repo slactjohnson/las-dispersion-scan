@@ -23,11 +23,10 @@ def get_pulse_spectrum(
 ) -> np.ndarray:
     """
     From a measured spectrum, generate the pypret.Pulse spectrum.
-
-    Modifies ``pulse.spectrum`` in-place.
     """
     # scale to intensity over frequency, convert to amplitude and normalize
     # spectrum = spectrum * wavelength * wavelength
+    # spectrum = spectrum.copy()
     spectrum[spectrum < 0.0] = 0.0
     spectrum = np.sqrt(spectrum + 0.0j)
     spectrum /= spectrum.max()

@@ -40,7 +40,7 @@ def plot_complex_phase(
     phase_blanking_threshold: float = 1e-3,
     amplitude_line: str = "r-",
     phase_line: str = "b-",
-):
+) -> Tuple[plt.Line2D, plt.Line2D, np.ndarray, np.ndarray]:
     """
     Plot complex phase.
 
@@ -221,7 +221,7 @@ class RetrievalResultPlot:
             raise ValueError(f"Unsupported x-axis for plotting: {xaxis}")
 
         # Plot in spectral domain
-        li21, li22, _, _ = pypret.graphics.plot_complex_phase(
+        li21, li22, _, _ = plot_complex_phase(
             w,
             spectrum2,
             ax2,
@@ -237,6 +237,7 @@ class RetrievalResultPlot:
             (li31,) = ax2.plot(fund_w, fundamental, "r", ms=4.0, mew=1.0, zorder=0)
             lines.append(li31)
             labels.append("measurement")
+
         li21.set_linewidth(3.0)
         li21.set_color("#1f77b4")
         li21.set_alpha(0.6)

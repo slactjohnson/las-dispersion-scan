@@ -3,6 +3,7 @@ import pathlib
 from typing import Any, ClassVar, Dict, Optional, Protocol, Type, Union
 
 import matplotlib.figure
+import numpy as np
 import pydm.widgets
 import typhos.related_display
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -211,6 +212,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self,
         parent: Optional[QtWidgets.QWidget] = None,
         loader: Optional[device_loader.Loader] = None,
+        debug: bool = False,
     ):
         super().__init__(parent=parent)
 
@@ -223,6 +225,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.show_type_hints()
         self.result = None
         self.data = None
+        self._debug = debug
         self._retrieval_thread = None
         self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
         self.update_button.clicked.connect(self._start_retrieval)
@@ -290,6 +293,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             raise RuntimeError("Another retrieval is currently running")
 
         def retrieval() -> None:
+            if self._debug:
+                # In debug mode, we keep the numpy random seed consistent
+                # between retrieval runs
+                np.random.seed(0)
             return dscan.PypretResult.from_data(**self.retrieval_parameters)
 
         def retrieval_finished(

@@ -113,6 +113,12 @@ def build_arg_parser(argparser=None):
         ),
     )
 
+    argparser.add_argument(
+        "--debug",
+        type=str,
+        help=("Enable debug mode: numpy random seed set at each retrieval"),
+    )
+
     return argparser
 
 
@@ -123,6 +129,7 @@ def main(
     script: Optional[str] = None,
     stage: Optional[str] = None,
     spectrometer: Optional[str] = None,
+    debug: bool = False,
 ) -> None:
     """
     Launch the d-scan GUI.
@@ -178,7 +185,7 @@ def main(
     )
     try:
         if screen == "main":
-            widget = DscanMain(loader=loader)
+            widget = DscanMain(loader=loader, debug=debug)
         else:
             raise ValueError(f"Unexpected screen type: {screen}")
         widget.show()

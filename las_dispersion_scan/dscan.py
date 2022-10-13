@@ -568,11 +568,15 @@ class PypretResult:
     @property
     def pulse_width_fs(self) -> float:
         """Get the reconstructed pulse width in femtoseconds."""
+        pulse = self._get_retrieval_pulse()
+        return pulse.fwhm(dt=pulse.dt / 100) / 1e-15
+
+    def _get_retrieval_pulse(self) -> pypret.Pulse:
         pulse = pypret.Pulse(self.retrieval.pnps.ft, self.retrieval.pnps.w0, unit="om")
         pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
             self._plot_param
         )
-        return pulse.fwhm(dt=pulse.dt / 100) / 1e-15
+        return pulse
 
     def plot_time_domain_retrieval(
         self,
@@ -620,19 +624,13 @@ class PypretResult:
         ax1 = cast(plt.Axes, fig.subplots(nrows=1, ncols=1))
         ax12 = cast(plt.Axes, ax1.twinx())
 
-        # reconstruct a pulse from that
-        pulse = pypret.Pulse(self.retrieval.pnps.ft, self.retrieval.pnps.w0, unit="om")
-
-        # Plot in time domain
-        pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
-            self._plot_param
-        )
+        pulse = self._get_retrieval_pulse()
         if oversampling:
             t = np.linspace(pulse.t[0], pulse.t[-1], pulse.N * oversampling)
-            field2 = pulse.field_at(t)
+            field2 = pulse.field_at(t).copy()
         else:
-            t = pulse.t
-            field2 = pulse.field
+            t = pulse.t.copy()
+            field2 = pulse.field.copy()
         field2 /= np.abs(field2).max()
 
         result_parameter_mid_idx = np.floor(len(field2) / 2) + 1
@@ -715,34 +713,25 @@ class PypretResult:
         ax2 = cast(plt.Axes, fig.subplots(nrows=1, ncols=1))
         ax22 = cast(plt.Axes, ax2.twinx())
 
-        # reconstruct a pulse from that
-        pulse = pypret.Pulse(self.retrieval.pnps.ft, self.retrieval.pnps.w0, unit="om")
-
-        # Plot in time domain
-        pulse.spectrum = self.retrieval.pulse_retrieved * self.retrieval.pnps.mask(
-            self._plot_param
-        )
-
+        pulse = self._get_retrieval_pulse()
         if oversampling:
             w = np.linspace(pulse.w[0], pulse.w[-1], pulse.N * oversampling)
-            spectrum2 = pulse.spectrum_at(w)
-            pulse.spectrum = self.retrieval.pulse_retrieved
+            spectrum2 = pulse.spectrum_at(w).copy()
+            pulse.spectrum = self.retrieval.pulse_retrieved.copy()
         else:
-            w = pulse.w
-            spectrum2 = self.retrieval.pulse_retrieved
+            w = pulse.w.copy()
+            spectrum2 = self.retrieval.pulse_retrieved.copy()
         fund_w = (
             pypret.frequencies.convert(self.fund.wavelengths, "wl", "om") - pulse.w0
         )
-        scale = np.abs(spectrum2).max()
-        spectrum2 /= scale
+        spectrum2 /= np.abs(spectrum2).max()
         if self.fund is None:
             fundamental = None
         else:
-            fundamental = np.copy(
-                self.fund_intensities_bkg_sub,
+            fundamental = self.get_fund_intensities_bkg_sub(
+                use_pulse_spectral_intensity=True
             )
-            scale_fund = np.abs(fundamental).max()
-            fundamental /= scale_fund
+            fundamental /= np.abs(fundamental).max()
 
         if xaxis == plotting.PlotXAxis.wavelength:
             w = pypret.frequencies.convert(w + pulse.w0, "om", "wl")
@@ -756,7 +745,7 @@ class PypretResult:
             raise ValueError(f"Unsupported x-axis for plotting: {xaxis}")
 
         # Plot in spectral domain
-        li21, li22, _, _ = pypret.graphics.plot_complex_phase(
+        li21, li22, _, _ = plotting.plot_complex_phase(
             w,
             spectrum2,
             ax2,
@@ -770,7 +759,7 @@ class PypretResult:
         labels = ["intensity", "phase"]
         if fundamental is not None:
             (li31,) = ax2.plot(fund_w, fundamental, "r", ms=4.0, mew=1.0, zorder=0)
-            lines.append(li31)
+            lines.append(cast(plt.Line2D, li31))
             labels.append("measurement")
         li21.set_linewidth(3.0)
         li21.set_color("#1f77b4")
@@ -976,23 +965,24 @@ class PypretResult:
         ax.set_xlim(-8 * self.optimum_fwhm * 1e15, 8 * self.optimum_fwhm * 1e15)
         return fig, ax
 
-    @property
-    def fund_intensities_bkg_sub(self) -> np.ndarray:
+    def get_fund_intensities_bkg_sub(
+        self, use_pulse_spectral_intensity: bool = False
+    ) -> np.ndarray:
         """
         Fundamental intensities with background subtracted.
         """
         assert self.pulse is not None
-        # TODO should this be applied to the end result?
+        _, intensities = self.fund.subtract_background()
+        if not use_pulse_spectral_intensity:
+            return intensities
+
         result_spec = scipy.interpolate.interp1d(
             self.pulse.wl,
             self.pulse.spectral_intensity,
             bounds_error=False,
             fill_value=0.0,
         )(self.fund.wavelengths)
-
-        _, intensities = self.fund.subtract_background()
-        intensities *= pypret.lib.best_scale(intensities, result_spec)
-        return intensities
+        return intensities * pypret.lib.best_scale(intensities, result_spec)
 
     def _get_rms_error(self) -> float:
         """
@@ -1009,11 +999,20 @@ class PypretResult:
             bounds_error=False,
             fill_value=0.0,
         )(self.fund.wavelengths)
-        return pypret.lib.nrms(self.fund_intensities_bkg_sub, result_spec)
+        return pypret.lib.nrms(
+            self.get_fund_intensities_bkg_sub(use_pulse_spectral_intensity=True),
+            result_spec,
+        )
 
-    def _get_retriever(
-        self, pulse: pypret.Pulse
-    ) -> pypret.retrieval.retriever.BaseRetriever:
+    def _retrieve(self) -> RetrievalResultStandin:
+        assert self.pulse is not None
+
+        retriever = self._get_retriever()
+        pypret.random_gaussian(self.pulse, self.fourier_transform_limit, phase_max=0.1)
+        retriever.retrieve(self.trace, self.pulse.spectrum, weights=None)
+        return cast(RetrievalResultStandin, retriever.result())
+
+    def _get_retriever(self) -> pypret.retrieval.retriever.BaseRetriever:
         """
         Get the pypret Retriever instance for the pulse.
 
@@ -1022,20 +1021,16 @@ class PypretResult:
         1. Sets self.trace_raw
         2. Sets self.trace
 
-        Parameters
-        ----------
-        pulse : pypret.Pulse
-            The pulse from the fundamental spectra.
-
         Returns
         -------
         pypret.Retriever
         """
+        assert self.pulse is not None
         self.trace_raw = self._get_mesh_data()
         pnps = pypret.PNPS(
-            pulse,
-            method=self.method,
-            process=self.nlin_process,
+            self.pulse,
+            method=self.method.value,
+            process=self.nlin_process.value,
             material=self.material.pypret_material,
         )
         self.trace = preprocess(
@@ -1046,7 +1041,7 @@ class PypretResult:
 
         if self.trace.units is not None and self.trace.units[1] == "m":
             # scaled in wavelength -> has to be corrected
-            wavelength = cast(float, self.trace.axes[1])
+            wavelength = cast(np.ndarray, self.trace.axes[1])
             frequency = pypret.frequencies.convert(wavelength, "wl", "om")
             self.trace.scale(wavelength * wavelength)
             self.trace.normalize()
@@ -1054,6 +1049,7 @@ class PypretResult:
             self.trace.units[1] = "Hz"
 
         self.trace.interpolate(axis2=pnps.process_w)
+
         return pypret.Retriever(
             pnps,
             RetrieverSolver(self.solver).value,
@@ -1093,7 +1089,9 @@ class PypretResult:
             scan_range=self.spec_scan_range,
             final_position=self._final_plot_position,
             scan_positions=self.scan.positions,
-            fundamental=self.fund_intensities_bkg_sub,
+            fundamental=self.get_fund_intensities_bkg_sub(
+                use_pulse_spectral_intensity=True
+            ),
             fundamental_wavelength=self.fund.wavelengths,
             fourier_transform_limit=self.fourier_transform_limit,
         )
@@ -1186,11 +1184,9 @@ class PypretResult:
         -------
         PypretResult
         """
-        fund = copy.deepcopy(fund)
-        scan = copy.deepcopy(scan)
         result = PypretResult(
-            fund=fund,
-            scan=scan,
+            fund=copy.deepcopy(fund),
+            scan=copy.deepcopy(scan),
             material=material,
             method=method,
             nlin_process=nlin_process,
@@ -1203,48 +1199,46 @@ class PypretResult:
             spec_fund_range=spec_fund_range,
             spec_scan_range=spec_scan_range,
         )
-        fund.wavelengths, fund.intensities = fund.truncate_wavelength(
-            range_low=result.spec_fund_range[0] * 1e-9,
-            range_high=result.spec_fund_range[1] * 1e-9,
-        )
-        logger.info(f"Fundamental center wavelength: {fund.raw_center * 1e9:.1f} nm")
-
-        ft = result._get_fourier_transform()
-        logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
-
-        result.pulse, result.fourier_transform_limit = fund._get_pulse(ft)
-        result.scan.intensities = gaussian_filter(
-            result.scan.intensities, sigma=blur_sigma
-        )
-
-        # Clean scan by truncating wavelength
-        (
-            result.scan.wavelengths,
-            result.scan.intensities,
-        ) = result.scan.truncate_wavelength(
-            range_low=result.spec_scan_range[0] * 1e-9,
-            range_high=result.spec_scan_range[1] * 1e-9,
-        )
-
-        result.scan.subtract_background_for_all_positions()
-
-        retriever = result._get_retriever(result.pulse)
-        pypret.random_gaussian(
-            result.pulse, result.fourier_transform_limit, phase_max=0.1
-        )
-        retriever.retrieve(result.trace, result.pulse.spectrum, weights=None)
-        result.retrieval = cast(RetrievalResultStandin, retriever.result())
-
-        result.rms_error = result._get_rms_error()
-        logger.info(f"RMS spectrum error: {result.rms_error}")
-
-        result.fwhm, result.result_profile = result._calculate_fwhm_and_profile()
-        result.plot = result._get_retrieval_plot()
+        result._run()
 
         if verbose:
             result.plot_all_debug()
 
         return result
+
+    def _run(self):
+        """Run the retrieval process as described in ``from_data``."""
+        self.fund.wavelengths, self.fund.intensities = self.fund.truncate_wavelength(
+            range_low=self.spec_fund_range[0] * 1e-9,
+            range_high=self.spec_fund_range[1] * 1e-9,
+        )
+        logger.info(
+            f"Fundamental center wavelength: {self.fund.raw_center * 1e9:.1f} nm"
+        )
+
+        ft = self._get_fourier_transform()
+        logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
+
+        self.pulse, self.fourier_transform_limit = self.fund._get_pulse(ft)
+        self.scan.intensities = gaussian_filter(
+            self.scan.intensities, sigma=self.blur_sigma
+        )
+
+        # Clean scan by truncating wavelength
+        (self.scan.wavelengths, self.scan.intensities,) = self.scan.truncate_wavelength(
+            range_low=self.spec_scan_range[0] * 1e-9,
+            range_high=self.spec_scan_range[1] * 1e-9,
+        )
+
+        self.scan.subtract_background_for_all_positions()
+
+        self.retrieval = self._retrieve()
+
+        self.rms_error = self._get_rms_error()
+        logger.info(f"RMS spectrum error: {self.rms_error}")
+
+        self.fwhm, self.result_profile = self._calculate_fwhm_and_profile()
+        self.plot = self._get_retrieval_plot()
 
     def plot_all_debug(
         self,
