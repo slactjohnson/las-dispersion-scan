@@ -326,15 +326,23 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if self._retrieval_thread is not None:
             raise RuntimeError("Another retrieval is currently running")
 
-        def retrieval() -> None:
+        def per_step_callback_in_thread(data: List[np.ndarray]) -> None:
+            """
+            Per-iteration step for pypret, called in a thread.
+
+            Do not do GUI operations here; subscribe to the signal instead.
+            """
+            self.retrieval_update.emit(self.pypret_result, data)
+
+        def retrieval() -> dscan.PypretResult:
             if self._debug:
                 # In debug mode, we keep the numpy random seed consistent
                 # between retrieval runs
                 np.random.seed(0)
-            return dscan.PypretResult.from_data(
-                **self.retrieval_parameters,
-                callback=self.retrieval_update.emit,
-            )
+            result = dscan.PypretResult.from_data(**self.retrieval_parameters)
+            self.pypret_result = result
+            result.run(callback=per_step_callback_in_thread)
+            return result
 
         def retrieval_finished(
             return_value: Optional[dscan.PypretResult], ex: Optional[Exception]

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import functools
 import logging
 import os
 import pathlib
@@ -409,7 +408,7 @@ def _default_ndarray():
 
 
 class Callback(Protocol):
-    def __call__(self, args: List[np.ndarray]) -> None:
+    def __call__(self, data: List[np.ndarray]) -> None:
         # mu: np.ndarray
         # parameter: np.ndarray
         # process_w: np.ndarray
@@ -1131,37 +1130,6 @@ class PypretResult:
         """
         Generate a PypretResult based on a copy of the input parameters.
 
-        This method does a number of things:
-
-        1. Truncates the fundamental spectrum data based on spec_fund_range
-        2. Configures the pypret.FourierTransform instance that specifies a
-           temporal and spectral grid. based on freq_bandwidth_wl,
-           fund.raw_center, and num_grid_points
-        3. Configures the pypret.Pulse based on the fourier transform from (2),
-           the fundamental spectrum raw center, background-subtracted
-           fundamental spectra.  Uses ``get_pulse_spectrum`` to set
-           ``pulse.spectrum``.  The fourier transform limit is also calculated
-           in this step.
-        4. Applies a gaussian filter with sigma ``blur_sigma`` on the acquired
-           scan intensities.  The scan spectra are then truncated based on
-           wavelength limits ``spec_scan_range``.
-        5. Subtracts the background for each spectra in the scan.
-        6. Generates a pypret.Retriever for the pulse.  This utilizes the
-           specified method, non-linear process, material, and solver.
-           It also preprocesses the trace data (via ``preprocess``) and
-           utilizes previously-generated data above.
-           The signal range is configured to be the first/last wavelength
-           of the scan data.
-           The trace is interpolated based on PNPS ``process_w``.
-        8. A random gaussian is applied to the resulting pulse with FWHM
-           of the fourier transform limit calculated above.
-        9. The retrieval process is run with the ``trace`` and the pulse
-           spectrum.  This is stored in ``retrieval``.
-        10. RMS error, per-parameter profiles and fwhm are then calculated.
-
-        The resulting PypretResult object may be used to inspect the process
-        or generate additional customized plots.
-
         Parameters
         ----------
         fund : SpectrumData
@@ -1198,7 +1166,7 @@ class PypretResult:
         -------
         PypretResult
         """
-        result = PypretResult(
+        return PypretResult(
             fund=copy.deepcopy(fund),
             scan=copy.deepcopy(scan),
             material=material,
@@ -1214,18 +1182,50 @@ class PypretResult:
             spec_scan_range=spec_scan_range,
         )
 
-        if callback is not None:
-            callback = functools.partial(callback, result)
+    def run(self, callback: Optional[Callback] = None, verbose: bool = False):
+        """
+        Pre-process the data and run the retrieval process as described below.
 
-        result._run(callback=callback)
+        This method does a number of things:
 
-        if verbose:
-            result.plot_all_debug()
+        1. Truncates the fundamental spectrum data based on spec_fund_range
+        2. Configures the pypret.FourierTransform instance that specifies a
+           temporal and spectral grid. based on freq_bandwidth_wl,
+           fund.raw_center, and num_grid_points
+        3. Configures the pypret.Pulse based on the fourier transform from (2),
+           the fundamental spectrum raw center, background-subtracted
+           fundamental spectra.  Uses ``get_pulse_spectrum`` to set
+           ``pulse.spectrum``.  The fourier transform limit is also calculated
+           in this step.
+        4. Applies a gaussian filter with sigma ``blur_sigma`` on the acquired
+           scan intensities.  The scan spectra are then truncated based on
+           wavelength limits ``spec_scan_range``.
+        5. Subtracts the background for each spectra in the scan.
+        6. Generates a pypret.Retriever for the pulse.  This utilizes the
+           specified method, non-linear process, material, and solver.
+           It also preprocesses the trace data (via ``preprocess``) and
+           utilizes previously-generated data above.
+           The signal range is configured to be the first/last wavelength
+           of the scan data.
+           The trace is interpolated based on PNPS ``process_w``.
+        8. A random gaussian is applied to the resulting pulse with FWHM
+           of the fourier transform limit calculated above.
+        9. The retrieval process is run with the ``trace`` and the pulse
+           spectrum.  This is stored in ``retrieval``.
+        10. RMS error, per-parameter profiles and fwhm are then calculated.
 
-        return result
+        The resulting PypretResult object may be used to inspect the process
+        or generate additional customized plots.
 
-    def _run(self, callback: Optional[Callback] = None):
-        """Run the retrieval process as described in ``from_data``."""
+        Parameters
+        ----------
+        callback : Callback or None, optional
+            A callback to run at each iteration.  Of the signature
+            ``callback(PypretResult, List[np.ndarray])``
+        verbose : bool, optional
+            Plot all "extra" / debug plots.
+        """
+
         self.fund.wavelengths, self.fund.intensities = self.fund.truncate_wavelength(
             range_low=self.spec_fund_range[0] * 1e-9,
             range_high=self.spec_fund_range[1] * 1e-9,
@@ -1257,6 +1257,9 @@ class PypretResult:
 
         self.fwhm, self.result_profile = self._calculate_fwhm_and_profile()
         self.plot = self._get_retrieval_plot()
+
+        if verbose:
+            self.plot_all_debug()
 
     def plot_all_debug(
         self,
