@@ -8,6 +8,7 @@ import typhos.related_display
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from qtpy import QtWidgets
 from qtpy.uic import loadUiType
+from typhos.utils import raise_to_operator
 
 from . import dscan
 from . import loader as device_loader
@@ -222,8 +223,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.show_type_hints()
         self.result = None
         self.data = None
+        self._retrieval_thread = None
         self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
-        self.update_button.clicked.connect(self._run_retrieval)
+        self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
 
         for radio in [
@@ -234,6 +236,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             self.retrieved_radio,
         ]:
             radio.clicked.connect(self._switch_plot)
+
         self._switch_plot()
         self._connect_devices()
 
@@ -278,14 +281,37 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         path = pathlib.Path(path).resolve()
         self.data = dscan.Acquisition.from_path(str(path))
 
-    def _run_retrieval(self) -> None:
+    def _start_retrieval(self) -> None:
         """Run the pulse retrieval process and update the plots."""
         if self.data is None:
             raise ValueError("Data not acquired or loaded; cannot run retrieval")
 
-        self.result = dscan.PypretResult.from_data(**self.retrieval_parameters)
-        self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
-        self._update_plots()
+        if self._retrieval_thread is not None:
+            raise RuntimeError("Another retrieval is currently running")
+
+        def retrieval() -> None:
+            return dscan.PypretResult.from_data(**self.retrieval_parameters)
+
+        def retrieval_finished(
+            return_value: Optional[dscan.PypretResult], ex: Optional[Exception]
+        ) -> None:
+            self.update_button.setEnabled(True)
+            self.replot_button.setEnabled(True)
+            self._retrieval_thread = None
+
+            if return_value is None or ex is not None:
+                raise_to_operator(ex)
+                return
+
+            self.result = return_value
+            self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
+            self._update_plots()
+
+        self._retrieval_thread = utils.ThreadWorker(func=retrieval)
+        self._retrieval_thread.returned.connect(retrieval_finished)
+        self.update_button.setEnabled(False)
+        self.replot_button.setEnabled(False)
+        self._retrieval_thread.start()
 
     def _update_plots(self) -> None:
         """Update all of the plots based on the results from pypret."""

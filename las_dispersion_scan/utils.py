@@ -1,7 +1,8 @@
 import functools
+import logging
 import pathlib
 from types import SimpleNamespace
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, ClassVar, Dict, Optional, Tuple
 
 import happi
 import numpy as np
@@ -13,6 +14,8 @@ import scipy.interpolate
 from qtpy import QtCore
 
 SOURCE_PATH = pathlib.Path(__file__).resolve().parent
+
+logger = logging.getLogger(__name__)
 
 
 def get_pulse_spectrum(
@@ -177,4 +180,55 @@ def channel_from_device(device: ophyd.Device) -> str:
 
 def channel_from_signal(signal: ophyd.signal.EpicsSignalBase) -> str:
     """PyDM-compatible PV name URIs from a given EpicsSignal."""
-    return f"ca://{signal.pvname}"
+    pvname = getattr(signal, "pvname", "")
+    return f"ca://{pvname}"
+
+
+class ThreadWorker(QtCore.QThread):
+    """
+    Worker thread helper.  For running a function in a background QThread.
+
+    Parameters
+    ----------
+    func : callable
+        The function to call when the thread starts.
+    *args
+        Arguments for the function call.
+    **kwargs
+        Keyword arguments for the function call.
+    """
+
+    #: The real signature of returned is: (Optional[Any], Optional[Exception])
+    returned: ClassVar[QtCore.Signal] = QtCore.Signal(object, object)
+    #: The function to call when the thread starts.
+    func: Callable
+    #: Arguments to pass to ``func``.
+    args: Tuple[Any, ...]
+    #: Keyword arguments to pass to ``func``.
+    kwargs: Dict[str, Any]
+    #: The resulting return value of the ``func``, after the thread exits or
+    #: ``returned`` is emitted.
+    return_value: Any
+
+    def __init__(self, func: Callable, *args, **kwargs):
+        super().__init__()
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.return_value = None
+
+    @QtCore.Slot()
+    def run(self):
+        try:
+            self.return_value = self.func(*self.args, **self.kwargs)
+        except Exception as ex:
+            logger.exception(
+                "Failed to run %s(*%s, **%r) in thread pool",
+                self.func,
+                self.args,
+                self.kwargs,
+            )
+            self.return_value = ex
+            self.returned.emit(None, ex)
+        else:
+            self.returned.emit(self.return_value, None)
