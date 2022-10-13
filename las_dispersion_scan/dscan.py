@@ -107,7 +107,7 @@ class SpectrumData:
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Truncating wavelength given the provided range."""
         idx = (self.wavelengths > range_low) & (self.wavelengths < range_high)
-        return self.wavelengths[idx], self.intensities[idx]
+        return self.wavelengths[idx].copy(), self.intensities[idx].copy()
 
     @classmethod
     def from_txt_file(cls, filename: str) -> SpectrumData:
@@ -322,7 +322,7 @@ class ScanData:
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Truncating wavelength given the provided range."""
         idx = (self.wavelengths > range_low) & (self.wavelengths < range_high)
-        return self.wavelengths[idx], self.intensities[:, idx]
+        return self.wavelengths[idx].copy(), self.intensities[:, idx].copy()
 
     @classmethod
     def from_txt_file(cls, filename: str) -> ScanData:
@@ -446,6 +446,7 @@ class PypretResult:
     retrieval: RetrievalResultStandin = dataclasses.field(
         default_factory=RetrievalResultStandin
     )
+    rms_error: float = 0.0
     #: A model of the femtosecond pulses by their envelope
     pulse: Optional[pypret.Pulse] = None
     #: The raw (not pre-processed) mesh data.
@@ -878,6 +879,8 @@ class PypretResult:
         """
         Calculates per-retrieval-parameter 'result_profile' and 'fwhm'.
 
+        Side-effect: modifies self.pulse.spectrum
+
         Returns
         -------
         np.ndarray
@@ -991,7 +994,7 @@ class PypretResult:
         intensities *= pypret.lib.best_scale(intensities, result_spec)
         return intensities
 
-    def get_rms_error(self) -> float:
+    def _get_rms_error(self) -> float:
         """
         RMS error of the final result, held in ``self.pulse``.
 
@@ -1119,7 +1122,8 @@ class PypretResult:
         This method does a number of things:
 
         1. Truncates the fundamental spectrum data based on spec_fund_range
-        2. Configures the pypret.FourierTransform based on freq_bandwidth_wl,
+        2. Configures the pypret.FourierTransform instance that specifies a
+           temporal and spectral grid. based on freq_bandwidth_wl,
            fund.raw_center, and num_grid_points
         3. Configures the pypret.Pulse based on the fourier transform from (2),
            the fundamental spectrum raw center, background-subtracted
@@ -1127,8 +1131,8 @@ class PypretResult:
            ``pulse.spectrum``.  The fourier transform limit is also calculated
            in this step.
         4. Applies a gaussian filter with sigma ``blur_sigma`` on the acquired
-            scan intensities.  The scan spectra are then truncated based on
-            wavelength limits ``spec_scan_range``.
+           scan intensities.  The scan spectra are then truncated based on
+           wavelength limits ``spec_scan_range``.
         5. Subtracts the background for each spectra in the scan.
         6. Generates a pypret.Retriever for the pulse.  This utilizes the
            specified method, non-linear process, material, and solver.
@@ -1140,7 +1144,7 @@ class PypretResult:
         8. A random gaussian is applied to the resulting pulse with FWHM
            of the fourier transform limit calculated above.
         9. The retrieval process is run with the ``trace`` and the pulse
-            spectrum.  This is stored in ``retrieval``.
+           spectrum.  This is stored in ``retrieval``.
         10. RMS error, per-parameter profiles and fwhm are then calculated.
 
         The resulting PypretResult object may be used to inspect the process
@@ -1231,8 +1235,8 @@ class PypretResult:
         retriever.retrieve(result.trace, result.pulse.spectrum, weights=None)
         result.retrieval = cast(RetrievalResultStandin, retriever.result())
 
-        rms_error = result.get_rms_error()
-        logger.info(f"RMS spectrum error: {rms_error}")
+        result.rms_error = result._get_rms_error()
+        logger.info(f"RMS spectrum error: {result.rms_error}")
 
         result.fwhm, result.result_profile = result._calculate_fwhm_and_profile()
         result.plot = result._get_retrieval_plot()
@@ -1251,7 +1255,7 @@ class PypretResult:
         show: bool = True,
     ) -> None:
         """
-        Plot the retrieval result in the time domain.
+        Plot all "verbose" or debug plots with the provided settings.
 
         Parameters
         ----------
