@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import functools
 import logging
 import os
 import pathlib
-from typing import Optional, Tuple, Union, cast
+from typing import List, Optional, Protocol, Tuple, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -405,6 +406,15 @@ class ScanData:
 def _default_ndarray():
     """Helper for optional ndarray values in dataclass fields."""
     return np.zeros(0)
+
+
+class Callback(Protocol):
+    def __call__(self, args: List[np.ndarray]) -> None:
+        # mu: np.ndarray
+        # parameter: np.ndarray
+        # process_w: np.ndarray
+        # new_spectrum: np.ndarray
+        ...
 
 
 @dataclasses.dataclass
@@ -1004,15 +1014,17 @@ class PypretResult:
             result_spec,
         )
 
-    def _retrieve(self) -> RetrievalResultStandin:
+    def _retrieve(self, callback: Optional[Callback] = None) -> RetrievalResultStandin:
         assert self.pulse is not None
 
-        retriever = self._get_retriever()
+        retriever = self._get_retriever(callback)
         pypret.random_gaussian(self.pulse, self.fourier_transform_limit, phase_max=0.1)
         retriever.retrieve(self.trace, self.pulse.spectrum, weights=None)
         return cast(RetrievalResultStandin, retriever.result())
 
-    def _get_retriever(self) -> pypret.retrieval.retriever.BaseRetriever:
+    def _get_retriever(
+        self, callback: Optional[Callback] = None
+    ) -> pypret.retrieval.retriever.BaseRetriever:
         """
         Get the pypret Retriever instance for the pulse.
 
@@ -1053,6 +1065,7 @@ class PypretResult:
         return pypret.Retriever(
             pnps,
             RetrieverSolver(self.solver).value,
+            callback=callback,
             verbose=True,
             maxiter=self.max_iter,
         )
@@ -1113,6 +1126,7 @@ class PypretResult:
         plot_position: Optional[float] = None,
         spec_fund_range: Tuple[float, float] = (400, 600),
         spec_scan_range: Tuple[float, float] = (200, 300),
+        callback: Optional[Callback] = None,
     ) -> PypretResult:
         """
         Generate a PypretResult based on a copy of the input parameters.
@@ -1199,14 +1213,18 @@ class PypretResult:
             spec_fund_range=spec_fund_range,
             spec_scan_range=spec_scan_range,
         )
-        result._run()
+
+        if callback is not None:
+            callback = functools.partial(callback, result)
+
+        result._run(callback=callback)
 
         if verbose:
             result.plot_all_debug()
 
         return result
 
-    def _run(self):
+    def _run(self, callback: Optional[Callback] = None):
         """Run the retrieval process as described in ``from_data``."""
         self.fund.wavelengths, self.fund.intensities = self.fund.truncate_wavelength(
             range_low=self.spec_fund_range[0] * 1e-9,
@@ -1232,7 +1250,7 @@ class PypretResult:
 
         self.scan.subtract_background_for_all_positions()
 
-        self.retrieval = self._retrieve()
+        self.retrieval = self._retrieve(callback)
 
         self.rms_error = self._get_rms_error()
         logger.info(f"RMS spectrum error: {self.rms_error}")

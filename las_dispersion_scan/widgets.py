@@ -1,13 +1,13 @@
 import enum
 import pathlib
-from typing import Any, ClassVar, Dict, Optional, Protocol, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union
 
 import matplotlib.figure
 import numpy as np
 import pydm.widgets
 import typhos.related_display
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
-from qtpy import QtWidgets
+from qtpy import QtCore, QtWidgets
 from qtpy.uic import loadUiType
 from typhos.utils import raise_to_operator
 
@@ -126,6 +126,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
     filename: ClassVar[str] = "main.ui"
 
+    # [mu, parameter, process_w, new_spectrum]
+    retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult, list)
+
     # UI-derived widgets:
     acquired_or_retrieved_frame: QtWidgets.QFrame
     acquired_radio: QtWidgets.QRadioButton
@@ -230,6 +233,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
         self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
+        self.retrieval_update.connect(self._retrieval_partial_update)
 
         for radio in [
             self.time_radio,
@@ -274,6 +278,36 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.dscan_difference_plot.setVisible(self.difference_radio.isChecked())
         self.dscan_retrieved_plot.setVisible(self.retrieved_radio.isChecked())
 
+    @QtCore.Slot(object, list)
+    def _retrieval_partial_update(
+        self, result: dscan.PypretResult, data: List[np.ndarray]
+    ):
+        ...
+        # TODO: some sort of live view here
+        # mu, parameter, process_w, new_spectrum = data  # noqa
+
+        # self.pulse_length_lineedit.setText(
+        #     f"(Working)"
+        # )
+        # fig = self.reconstructed_time_plot.figure
+        # fig.clf()
+
+        # ax1 = cast(plt.Axes, fig.subplots(nrows=1, ncols=1))
+        # ax12 = cast(plt.Axes, ax1.twinx())
+
+        # pypret.graphics.plot_complex(
+        #     ...,
+        #     ...,
+        #     new_spectrum,
+        #     ax1,
+        #     ax12,
+        #     yaxis="intensity",
+        #     phase_blanking=False,
+        #     limit=True,
+        #     phase_blanking_threshold=0.01,
+        # )
+        # self.reconstructed_time_plot.draw()
+
     def load_path(self, path: Union[str, pathlib.Path]):
         """
         Load data from the provided path.
@@ -297,7 +331,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 # In debug mode, we keep the numpy random seed consistent
                 # between retrieval runs
                 np.random.seed(0)
-            return dscan.PypretResult.from_data(**self.retrieval_parameters)
+            return dscan.PypretResult.from_data(
+                **self.retrieval_parameters,
+                callback=self.retrieval_update.emit,
+            )
 
         def retrieval_finished(
             return_value: Optional[dscan.PypretResult], ex: Optional[Exception]
