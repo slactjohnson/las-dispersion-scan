@@ -238,14 +238,13 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         self.show_type_hints()
         self.result = None
-        self.data = None
         self.acquisition_scan = None
+        self.saved_filename = None
         self._debug = debug
         self._retrieval_thread = None
         self._scan_thread = None
         self._export_menu = None
         self.data = dscan.Acquisition()
-        # self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
         self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
         self.retrieval_update.connect(self._retrieval_partial_update)
@@ -266,6 +265,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._switch_plot()
         self._create_menus()
         self._connect_devices()
+        self._update_title()
 
     def _connect_devices(self) -> None:
         if self.devices is None:
@@ -273,7 +273,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         stage = self.devices.stage
         spectrometer = self.devices.spectrometer
-        status = self.devices.status
         self.stage_suite_button.setText(stage.name)
         self.stage_suite_button.add_device(stage)
 
@@ -284,7 +283,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         self.spectrometer_suite_button.setText(spectrometer.name)
         self.spectrometer_suite_button.add_device(spectrometer)
-        self.setWindowTitle(f"D-scan Diagnostic ({status.prefix})")
 
         readback = getattr(stage, "user_readback", None)
         if readback is not None:
@@ -295,6 +293,19 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             self.spectrometer_status_label.channel = utils.channel_from_signal(
                 spec_status
             )
+
+    def _update_title(self) -> None:
+        if self.devices is not None:
+            prefix = self.devices.status.prefix
+        else:
+            prefix = None
+
+        title = f"D-scan Diagnostic ({prefix})"
+
+        if self.saved_filename is not None:
+            title = f"{title}: {self.saved_filename}"
+
+        self.setWindowTitle(title)
 
     def _switch_plot(self):
         self.reconstructed_time_plot.setVisible(self.time_radio.isChecked())
@@ -312,14 +323,25 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.export_button.setMenu(self._export_menu)
 
     def _save_as_dat(
-        self, directory: Optional[Union[pathlib.Path, str]] = None
-    ) -> pathlib.Path:
-        ...
+        self, *, directory: Optional[Union[pathlib.Path, str]] = None
+    ) -> Optional[pathlib.Path]:
+        if directory is None:
+            directory = QtWidgets.QFileDialog.getExistingDirectory(
+                self, "Directory to save files (fund.dat; scan.dat)"
+            )
+            if not directory:
+                return
+
+        directory = pathlib.Path(directory)
+        self.data.save(directory, format="dat")
+        self.saved_filename = f"{directory}/*.dat"
+        self._update_title()
+        return directory
 
     def _save_as_npz(
-        self, filename: Optional[Union[pathlib.Path, str]] = None
-    ) -> pathlib.Path:
-        if not filename:
+        self, *, filename: Optional[Union[pathlib.Path, str]] = None
+    ) -> Optional[pathlib.Path]:
+        if filename is None:
             filename, filter_ = QtWidgets.QFileDialog.getSaveFileName(
                 self, "Save all data", ".", "Numpy zip file (*.npz);;All files (*.*)"
             )
@@ -327,7 +349,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 return
 
         filename = pathlib.Path(filename)
+        self.data.settings = dict(**self.retrieval_parameters, **self.plot_parameters)
         self.data.save(filename, format="npz")
+        self.saved_filename = filename
+        self._update_title()
         return filename
 
     @QtCore.Slot(object)
@@ -393,14 +418,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         """
         path = pathlib.Path(path).resolve()
         self.data = dscan.Acquisition.from_path(str(path))
-        self.save_to_npz("/Users/klauer/Repos/sim-ioc/simioc/ioc/dscan_sample.npz")
-
-    def save_to_npz(self, path: Union[str, pathlib.Path]):
-        if self.data is None:
-            return
-
-        self.data.settings = dict(**self.retrieval_parameters, **self.plot_parameters)
-        self.data.save(path)
+        self.saved_filename = path
+        self._update_title()
 
     def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
         self.scan_status_label.setText(

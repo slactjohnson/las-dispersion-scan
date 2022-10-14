@@ -239,6 +239,21 @@ class SpectrumData:
         # intensities *= wavelengths * wavelengths
         return cls(wavelengths, intensities)
 
+    def save_dat(self, filename: Union[str, pathlib.Path]):
+        """
+        Save the spectrum to the provided filename, in 'dat' format.
+
+        Parameters
+        ----------
+        filename : Union[str, pathlib.Path]
+            The filename to save to.
+        """
+        if len(self.wavelengths) == 0:
+            return
+        np.savetxt(
+            filename, np.column_stack((self.wavelengths * 1e9, self.intensities))
+        )
+
     def get_background(self, *, count: int = 15) -> Tuple[np.ndarray, np.ndarray]:
         """
         Get the background, based on the first and last ``count`` items.
@@ -388,7 +403,6 @@ class ScanData:
         result[0, 1:] = dscan_conv[1:, 0].transpose()
         result[1:, 0] = dscan_conv[0, 2:].transpose()
         result[1:, 1:] = dscan_conv[1:, 2:].transpose()
-        # np.savetxt(path_full_scan, result)
         return cls(
             positions=result[0],
             wavelengths=result[1],
@@ -416,6 +430,24 @@ class ScanData:
         intensities = scan_data[1:, 1:].transpose()
         intensities /= np.amax(intensities)
         return cls(positions, wavelengths, intensities)
+
+    def save_dat(self, filename: Union[str, pathlib.Path]):
+        """
+        Save the scan data to the provided filename, in 'dat' format.
+
+        Parameters
+        ----------
+        filename : Union[str, pathlib.Path]
+            The filename to save to.
+        """
+        if len(self.positions) == 0:
+            return
+
+        data = np.zeros((len(self.wavelengths) + 1, len(self.positions) + 1))
+        data[0, 1:] = self.positions * 1e3
+        data[1:, 0] = self.wavelengths * 1e9
+        data[1:, 1:] = self.intensities.transpose()
+        np.savetxt(filename, data)
 
     @classmethod
     def from_path(cls, path: Union[pathlib.Path, str]) -> ScanData:
@@ -497,13 +529,14 @@ class Acquisition:
 
     def save(self, path: Union[pathlib.Path, str], format: str = "npz") -> None:
         """
-        Save acquisition data to a single 'npz' file.
+        Save acquisition data to a single 'npz' file or multiple 'dat' files.
 
         Parameters
         ----------
         path : str or pathlib.Path
-            Directory where the old files are to be found.
+            Filename (npz) or directory (dat) to save to.
         """
+        path = pathlib.Path(path)
         if format == "npz":
             self.settings.pop("fund", None)
             self.settings.pop("scan", None)
@@ -516,6 +549,13 @@ class Acquisition:
                 intensities=self.scan.intensities,
                 settings=np.array(self.settings, dtype=object),
             )
+            return
+
+        if format == "dat":
+            if not path.is_dir():
+                raise ValueError(f"{path} is not a directory name to save to")
+            self.fundamental.save_dat(path / "fund.dat")
+            self.scan.save_dat(path / "scan.dat")
             return
 
         raise ValueError(f"Unsupported format {format}")

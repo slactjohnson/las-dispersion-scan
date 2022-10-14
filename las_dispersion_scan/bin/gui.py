@@ -122,6 +122,10 @@ def build_arg_parser(argparser=None):
         ),
     )
 
+    argparser.add_argument(
+        "--load", dest="data_path", type=str, help="Load a data file at the start"
+    )
+
     return argparser
 
 
@@ -132,6 +136,7 @@ def main(
     script: Optional[str] = None,
     stage: Optional[str] = None,
     spectrometer: Optional[str] = None,
+    data_path: Optional[str] = None,
     debug: bool = False,
 ) -> None:
     """
@@ -155,6 +160,8 @@ def main(
     spectrometer : str, optional
         Spectrometer name from the happi database. Overrides the
         script-provided settings if specified.
+    data_path : str, optional
+        File to load when the GUI opens.
     """
 
     if script is not None and ("/" in script or "\\" in script):
@@ -185,10 +192,13 @@ def main(
         script=script,
         stage=stage,
         spectrometer=spectrometer,
+        prefix=prefix,
     )
     try:
         if screen == "main":
             widget = DscanMain(loader=loader, debug=debug)
+            if data_path is not None:
+                widget.load_path(data_path)
         else:
             raise ValueError(f"Unexpected screen type: {screen}")
         widget.show()
