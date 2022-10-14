@@ -136,7 +136,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult, list)
 
     # pypret / scan-related
-    data: Optional[dscan.Acquisition]
+    data: dscan.Acquisition
     result: Optional[dscan.PypretResult]
     loader: device_loader.Loader
     devices: device_loader.Devices
@@ -243,7 +243,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._debug = debug
         self._retrieval_thread = None
         self._scan_thread = None
-        self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
+        self._export_menu = None
+        self.data = dscan.Acquisition()
+        # self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
         self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
         self.retrieval_update.connect(self._retrieval_partial_update)
@@ -262,6 +264,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.scan_button.clicked.connect(self._start_scan)
         self.new_scan_point.connect(self._on_new_scan_point)
         self._switch_plot()
+        self._create_menus()
         self._connect_devices()
 
     def _connect_devices(self) -> None:
@@ -300,10 +303,42 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.dscan_difference_plot.setVisible(self.difference_radio.isChecked())
         self.dscan_retrieved_plot.setVisible(self.retrieved_radio.isChecked())
 
+    def _create_menus(self):
+        self._export_menu = QtWidgets.QMenu()
+        npz_export = self._export_menu.addAction("Save as one .npz file")
+        npz_export.triggered.connect(self._save_as_npz)
+        dat_export = self._export_menu.addAction("Save as separate .dat files")
+        dat_export.triggered.connect(self._save_as_dat)
+        self.export_button.setMenu(self._export_menu)
+
+    def _save_as_dat(
+        self, directory: Optional[Union[pathlib.Path, str]] = None
+    ) -> pathlib.Path:
+        ...
+
+    def _save_as_npz(
+        self, filename: Optional[Union[pathlib.Path, str]] = None
+    ) -> pathlib.Path:
+        if not filename:
+            filename, filter_ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save all data", ".", "Numpy zip file (*.npz);;All files (*.*)"
+            )
+            if not filename:
+                return
+
+        filename = pathlib.Path(filename)
+        self.data.save(filename, format="npz")
+        return filename
+
     @QtCore.Slot(object)
     def _on_scan_finished(self, data: dscan.ScanData):
         if self._retrieval_thread is not None:
             return
+
+        if not len(self.data.fundamental.wavelengths):
+            self.data.fundamental.wavelengths = data.wavelengths
+            self.data.fundamental.intensities = data.intensities[0, :]
+
         self._start_retrieval()
 
     @QtCore.Slot(object, list)
@@ -340,7 +375,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if self.devices is None:
             return
 
-        assert self.data is not None
         self.data.fundamental = dscan.SpectrumData.from_device(
             self.devices.spectrometer
         )
@@ -548,14 +582,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     @property
     def retrieval_parameters(self) -> Dict[str, Any]:
         """Parameters to be passed to ``PypretResult.from_data``."""
-        if self.data is not None:
-            acquisition = dict(
-                fund=self.data.fundamental,
-                scan=self.data.scan,
-            )
-        else:
-            acquisition = {}
-
         if (
             self.fundamental_low_spinbox.value()
             >= self.fundamental_high_spinbox.value()
@@ -577,6 +603,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             )
 
         return dict(
+            fund=self.data.fundamental,
+            scan=self.data.scan,
             material=self.material_combo.current_enum_value,
             method=self.pulse_analysis_combo.current_enum_value,
             nlin_process=self.nonlinear_combo.current_enum_value,
@@ -594,5 +622,4 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 self.scan_wavelength_high_spinbox.value(),
             ),
             plot_position=None,  # TODO
-            **acquisition,
         )

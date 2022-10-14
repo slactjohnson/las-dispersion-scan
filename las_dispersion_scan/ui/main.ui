@@ -105,8 +105,44 @@
          </property>
         </widget>
        </item>
+       <item row="7" column="1">
+        <widget class="QPushButton" name="take_fundamental_button">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Take fundamental</string>
+         </property>
+        </widget>
+       </item>
        <item row="19" column="1" colspan="2">
         <widget class="MaterialComboBox" name="material_combo"/>
+       </item>
+       <item row="1" column="2">
+        <widget class="PyDMLabel" name="stage_status_label">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="showUnits" stdset="0">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="29" column="1">
+        <widget class="QCheckBox" name="debug_mode_checkbox">
+         <property name="toolTip">
+          <string>Show all available debug plots in separate windows after pulse retrieval</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
        </item>
        <item row="3" column="1">
         <widget class="QDoubleSpinBox" name="scan_start_spinbox">
@@ -124,6 +160,13 @@
          </property>
          <property name="value">
           <double>0.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="PyDMLabel" name="spectrometer_status_label">
+         <property name="toolTip">
+          <string/>
          </property>
         </widget>
        </item>
@@ -560,6 +603,19 @@
          </property>
         </widget>
        </item>
+       <item row="7" column="2">
+        <widget class="QPushButton" name="scan_button">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>&amp;Start scan</string>
+         </property>
+        </widget>
+       </item>
        <item row="22" column="0">
         <widget class="QLabel" name="solver_label">
          <property name="sizePolicy">
@@ -670,6 +726,25 @@
          </property>
          <property name="text">
           <string>stage_name</string>
+         </property>
+        </widget>
+       </item>
+       <item row="29" column="0">
+        <widget class="QLabel" name="debug_mode_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Phase blanking threshold</string>
+         </property>
+         <property name="text">
+          <string>Debug mode</string>
+         </property>
+         <property name="buddy">
+          <cstring>debug_mode_checkbox</cstring>
          </property>
         </widget>
        </item>
@@ -817,81 +892,6 @@
          </property>
          <property name="value">
           <double>950.000000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="29" column="0">
-        <widget class="QLabel" name="debug_mode_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Phase blanking threshold</string>
-         </property>
-         <property name="text">
-          <string>Debug mode</string>
-         </property>
-         <property name="buddy">
-          <cstring>debug_mode_checkbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="29" column="1">
-        <widget class="QCheckBox" name="debug_mode_checkbox">
-         <property name="toolTip">
-          <string>Show all available debug plots in separate windows after pulse retrieval</string>
-         </property>
-         <property name="text">
-          <string/>
-         </property>
-         <property name="checked">
-          <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="2">
-        <widget class="PyDMLabel" name="stage_status_label">
-         <property name="toolTip">
-          <string/>
-         </property>
-         <property name="showUnits" stdset="0">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
-        <widget class="PyDMLabel" name="spectrometer_status_label">
-         <property name="toolTip">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="7" column="2">
-        <widget class="QPushButton" name="scan_button">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>&amp;Start scan</string>
-         </property>
-        </widget>
-       </item>
-       <item row="7" column="1">
-        <widget class="QPushButton" name="take_fundamental_button">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Take fundamental</string>
          </property>
         </widget>
        </item>

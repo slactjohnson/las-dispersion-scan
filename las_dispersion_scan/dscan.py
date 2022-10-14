@@ -36,6 +36,11 @@ from .utils import RetrievalResultStandin, get_pulse_spectrum, preprocess
 logger = logging.getLogger(__name__)
 
 
+def _default_ndarray():
+    """Helper for optional ndarray values in dataclass fields."""
+    return np.zeros(0)
+
+
 def get_fundamental_spectrum(
     wavelengths: np.ndarray,
     intensities: np.ndarray,
@@ -74,8 +79,8 @@ def get_fundamental_spectrum(
 
 @dataclasses.dataclass
 class SpectrumData:
-    wavelengths: np.ndarray
-    intensities: np.ndarray
+    wavelengths: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
+    intensities: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
 
     def _get_pulse(self, ft: pypret.FourierTransform) -> Tuple[pypret.Pulse, float]:
         """
@@ -334,11 +339,11 @@ class SpectrumData:
 @dataclasses.dataclass
 class ScanData:
     #: Scan positions
-    positions: np.ndarray
+    positions: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
     #: Wavelengths
-    wavelengths: np.ndarray
+    wavelengths: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
     #: Normalized intensities
-    intensities: np.ndarray
+    intensities: np.ndarray = dataclasses.field(default_factory=_default_ndarray)
 
     def subtract_background_for_all_positions(self, count: int = 15) -> None:
         """
@@ -443,8 +448,8 @@ class ScanData:
 
 @dataclasses.dataclass
 class Acquisition:
-    fundamental: SpectrumData
-    scan: ScanData
+    fundamental: SpectrumData = dataclasses.field(default_factory=SpectrumData)
+    scan: ScanData = dataclasses.field(default_factory=ScanData)
     settings: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     @classmethod
@@ -514,11 +519,6 @@ class Acquisition:
             return
 
         raise ValueError(f"Unsupported format {format}")
-
-
-def _default_ndarray():
-    """Helper for optional ndarray values in dataclass fields."""
-    return np.zeros(0)
 
 
 class Callback(Protocol):
