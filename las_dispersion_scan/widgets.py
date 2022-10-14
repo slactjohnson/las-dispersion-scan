@@ -127,7 +127,18 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     filename: ClassVar[str] = "main.ui"
 
     # [mu, parameter, process_w, new_spectrum]
+    new_scan_point: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanPointData)
     retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult, list)
+
+    # pypret / scan-related
+    data: Optional[dscan.Acquisition]
+    result: Optional[dscan.PypretResult]
+    loader: device_loader.Loader
+    devices: device_loader.Devices
+    scan: Optional[dscan.AcquisitionScan]
+    scan_data: Optional[dscan.ScanData]
+    _scan_thread: Optional[utils.ThreadWorker]
+    _retrieval_thread: Optional[utils.ThreadWorker]
 
     # UI-derived widgets:
     acquired_or_retrieved_frame: QtWidgets.QFrame
@@ -206,11 +217,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     wedge_angle_label: QtWidgets.QLabel
     wedge_angle_spin: QtWidgets.QDoubleSpinBox
 
-    data: Optional[dscan.Acquisition]
-    result: Optional[dscan.PypretResult]
-    loader: device_loader.Loader
-    devices: device_loader.Devices
-
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
@@ -228,8 +234,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.show_type_hints()
         self.result = None
         self.data = None
+        self.acquisition_scan = None
         self._debug = debug
         self._retrieval_thread = None
+        self._scan_thread = None
         self.load_path("/Users/klauer/Repos/general_dscan/Data/XCS/2022_08_15/Dscan_7")
         self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
@@ -244,6 +252,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         ]:
             radio.clicked.connect(self._switch_plot)
 
+        self.scan_button.clicked.connect(self._start_scan)
+        self.new_scan_point.connect(self._on_new_scan_point)
         self._switch_plot()
         self._connect_devices()
 
@@ -317,6 +327,67 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         """
         path = pathlib.Path(path).resolve()
         self.data = dscan.Acquisition.from_path(str(path))
+
+    def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
+        self.scan_status_label.setText(
+            f"Acquired [{data.index + 1}] at {data.readback} {data.position_units}"
+        )
+
+    def _start_scan(self) -> None:
+        """Start a scan/acquisition to get spectra for the configured points."""
+        if self._scan_thread is not None:
+            if self.scan is not None:
+                self.scan.stop()
+                return
+
+            raise RuntimeError("Another scan is currently running")
+
+        if self.devices is None:
+            raise RuntimeError("Device loader not configured; scans not possible")
+
+        def scan() -> dscan.ScanData:
+            assert self.scan is not None
+
+            for point in self.scan.run(
+                positions=list(positions),
+                dwell_time=dwell_time,
+            ):
+                self.new_scan_point.emit(point)
+
+            assert self.scan.data is not None
+            return self.scan.data
+
+        def scan_finished(
+            return_value: Optional[dscan.ScanData], ex: Optional[Exception]
+        ) -> None:
+            self.scan_button.setText("&Start")
+            self.scan_status_label.setText("Scan finished.")
+            self._scan_thread = None
+
+            if return_value is None or ex is not None:
+                raise_to_operator(ex)
+                return
+
+            self.scan_data = return_value
+
+        positions = np.linspace(
+            start=self.scan_start_spinbox.value(),
+            stop=self.scan_end_spinbox.value(),
+            num=self.scan_steps_spinbox.value(),
+        )
+        dwell_time = self.dwell_time_spinbox.value()
+        if len(positions) <= 1:
+            raise ValueError("Invalid scan parameters specified.")
+
+        self.scan = dscan.AcquisitionScan(
+            stage=self.devices.stage, spectrometer=self.devices.spectrometer
+        )
+        self.scan_status_label.setText("Scan initialized...")
+        self._scan_thread = utils.ThreadWorker(func=scan)
+        self._scan_thread.returned.connect(scan_finished)
+
+        self.scan_button.setText("&Stop")
+        self._scan_thread.start()
 
     def _start_retrieval(self) -> None:
         """Run the pulse retrieval process and update the plots."""

@@ -5,7 +5,9 @@ import dataclasses
 import logging
 import os
 import pathlib
-from typing import List, Optional, Protocol, Tuple, Union, cast
+import time
+from collections import deque
+from typing import Generator, List, Optional, Protocol, Sequence, Tuple, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +17,7 @@ import scipy.interpolate
 from matplotlib.ticker import EngFormatter
 from scipy.ndimage import gaussian_filter
 
-from . import plotting
+from . import devices, plotting
 from .options import Material, NonlinearProcess, PulseAnalysisMethod, RetrieverSolver
 from .plotting import RetrievalResultPlot
 from .utils import RetrievalResultStandin, get_pulse_spectrum, preprocess
@@ -440,6 +442,114 @@ class Callback(Protocol):
         # process_w: np.ndarray
         # new_spectrum: np.ndarray
         ...
+
+
+@dataclasses.dataclass
+class ScanPointData:
+    index: int
+    setpoint: float
+    readback: float
+    position_units: str
+    wavelengths: List[float]
+    spectrum: List[float]
+
+    @classmethod
+    def from_devices(
+        cls,
+        index: int,
+        setpoint: float,
+        stage: devices.Stage,
+        spectrometer: devices.Spectrometer,
+    ) -> ScanPointData:
+        return ScanPointData(
+            index=index,
+            setpoint=setpoint,
+            readback=stage.user_readback.get(),
+            position_units=stage.egu,
+            wavelengths=list(cast(Sequence[float], spectrometer.wavelengths.get())),
+            spectrum=list(cast(Sequence[float], spectrometer.spectrum.get())),
+        )
+
+
+class AcquisitionScan:
+    stage: devices.Stage
+    spectrometer: devices.Spectrometer
+    data: Optional[ScanData]
+
+    def __init__(
+        self,
+        stage: devices.Stage,
+        spectrometer: devices.Spectrometer,
+    ):
+        self.stage = stage
+        self.spectrometer = spectrometer
+        self.data = None
+        self._stop = False
+
+    def stop(self):
+        self._stop = True
+
+    def run(
+        self,
+        positions: List[float],
+        dwell_time: float,
+        timeout: float = 30.0,
+    ) -> Generator[ScanPointData, None, None]:
+        """
+        Take a scan using the configured stage and spectrometer.
+        """
+        # bluesky, what's that? *cough*
+
+        self._stop = False
+
+        for dev in [self.stage, self.spectrometer]:
+            try:
+                dev.wait_for_connection()
+            except Exception as ex:
+                logger.exception(f"{dev.name} wait for connection failed")
+                raise RuntimeError(
+                    f"{dev.name} communication or configuration incorrect; unable to perform "
+                    f"scan.  {ex.__class__.__name__} {ex}"
+                )
+
+        remaining = deque(enumerate(positions))
+        all_data = []
+
+        while remaining and not self._stop:
+            idx, setpoint = remaining[0]
+            self.stage.set(setpoint).wait(timeout=timeout)
+            t0 = time.monotonic()
+            while not self._stop and time.monotonic() - t0 < dwell_time:
+                time.sleep(dwell_time / 10.0)
+
+            if self._stop:
+                break
+
+            data = ScanPointData.from_devices(
+                index=idx,
+                setpoint=setpoint,
+                stage=self.stage,
+                spectrometer=self.spectrometer,
+            )
+            if all_data and data.spectrum == all_data[-1].spectrum:
+                logger.warning(
+                    "Retrying scan point %d (%g); spectra identical to previous "
+                    "point",
+                    idx,
+                    setpoint,
+                )
+                time.sleep(0.1)
+                continue
+
+            all_data.append(data)
+            remaining.popleft()
+            yield data
+
+        self.data = ScanData(
+            positions=np.asarray([data.readback for data in all_data]),
+            wavelengths=np.asarray([data.wavelengths for data in all_data]),
+            intensities=np.asarray([data.spectrum for data in all_data]),
+        )
 
 
 @dataclasses.dataclass
