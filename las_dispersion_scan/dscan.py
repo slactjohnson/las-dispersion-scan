@@ -7,7 +7,18 @@ import os
 import pathlib
 import time
 from collections import deque
-from typing import Generator, List, Optional, Protocol, Sequence, Tuple, Union, cast
+from typing import (
+    Any,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -173,6 +184,32 @@ class SpectrumData:
             ...
 
         raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
+
+    @classmethod
+    def from_device(cls, device: devices.Spectrometer) -> SpectrumData:
+        """
+        Acquire spectra from the given device.
+
+        Parameters
+        ----------
+        device : Spectrometer
+            Spectrometer device instance
+
+        Returns
+        -------
+        SpectrumData
+            The acquired data
+        """
+        wavelengths = np.trim_zeros(
+            cast(Sequence[float], device.wavelengths.get()), "b"
+        )
+        intensities = np.array(
+            cast(Sequence[float], device.spectrum.get())[: len(wavelengths)]
+        )
+        return cls(
+            wavelengths=wavelengths,
+            intensities=intensities,
+        )
 
     @classmethod
     def from_file(cls, path: Union[pathlib.Path, str]) -> SpectrumData:
@@ -408,6 +445,7 @@ class ScanData:
 class Acquisition:
     fundamental: SpectrumData
     scan: ScanData
+    settings: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
     @classmethod
     def from_path(cls, path: Union[pathlib.Path, str]) -> Acquisition:
@@ -417,17 +455,65 @@ class Acquisition:
         Parameters
         ----------
         path : str
-            Directory where the old files are to be found.
+            Directory where the old files are to be found, or a direct path
+            to a .npz file.
 
         Returns
         -------
         Acquisition
             The data from the scan.
         """
+        path = pathlib.Path(path)
+        if path.suffix.lower() == ".npz":
+            loaded = np.load(path, allow_pickle=True)
+            try:
+                settings = loaded["settings"][()]
+            except Exception:
+                settings = {}
+                logger.exception("Failed to unpickle settings from the file")
+
+            return cls(
+                fundamental=SpectrumData(
+                    wavelengths=loaded["fund_wavelengths"],
+                    intensities=loaded["fund_intensities"],
+                ),
+                scan=ScanData(
+                    positions=loaded["positions"],
+                    wavelengths=loaded["wavelengths"],
+                    intensities=loaded["intensities"],
+                ),
+                settings=settings,
+            )
+
         return cls(
             fundamental=SpectrumData.from_path(path),
             scan=ScanData.from_path(path),
         )
+
+    def save(self, path: Union[pathlib.Path, str], format: str = "npz") -> None:
+        """
+        Save acquisition data to a single 'npz' file.
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            Directory where the old files are to be found.
+        """
+        if format == "npz":
+            self.settings.pop("fund", None)
+            self.settings.pop("scan", None)
+            np.savez_compressed(
+                str(path),
+                fund_wavelengths=self.fundamental.wavelengths,
+                fund_intensities=self.fundamental.intensities,
+                positions=self.scan.positions,
+                wavelengths=self.scan.wavelengths,
+                intensities=self.scan.intensities,
+                settings=np.array(self.settings, dtype=object),
+            )
+            return
+
+        raise ValueError(f"Unsupported format {format}")
 
 
 def _default_ndarray():
@@ -444,12 +530,35 @@ class Callback(Protocol):
         ...
 
 
+def convert_to_meters(value: float, units: str) -> float:
+    """
+    Convert the provided value to meters.
+
+    Parameters
+    ----------
+    value : float
+        The starting value with the units specified.
+    units : str
+        Units for ``value``.
+
+    Returns
+    -------
+    float
+    """
+    factor = {
+        "m": 1.0,
+        "mm": 1.0e-3,
+        "um": 1.0e-6,
+        "nm": 1.0e-9,
+    }[units]
+    return factor * value
+
+
 @dataclasses.dataclass
 class ScanPointData:
     index: int
     setpoint: float
     readback: float
-    position_units: str
     wavelengths: List[float]
     spectrum: List[float]
 
@@ -461,13 +570,13 @@ class ScanPointData:
         stage: devices.Stage,
         spectrometer: devices.Spectrometer,
     ) -> ScanPointData:
+        spectrum = SpectrumData.from_device(spectrometer)
         return ScanPointData(
             index=index,
-            setpoint=setpoint,
-            readback=stage.user_readback.get(),
-            position_units=stage.egu,
-            wavelengths=list(cast(Sequence[float], spectrometer.wavelengths.get())),
-            spectrum=list(cast(Sequence[float], spectrometer.spectrum.get())),
+            setpoint=convert_to_meters(setpoint, stage.egu),
+            readback=convert_to_meters(stage.user_readback.get(), stage.egu),
+            wavelengths=spectrum.wavelengths.tolist(),
+            spectrum=spectrum.intensities.tolist(),
         )
 
 
@@ -512,6 +621,13 @@ class AcquisitionScan:
                     f"scan.  {ex.__class__.__name__} {ex}"
                 )
 
+        if self.stage.egu not in ("m", "mm", "um", "nm"):
+            raise ValueError(
+                f"Stage units {self.stage.egu} are not supported; please convert them to "
+                f"(for example) ``mm`` in the ophyd class"
+            )
+
+        initial_position = self.stage.user_readback.get()
         remaining = deque(enumerate(positions))
         all_data = []
 
@@ -545,11 +661,14 @@ class AcquisitionScan:
             remaining.popleft()
             yield data
 
-        self.data = ScanData(
-            positions=np.asarray([data.readback for data in all_data]),
-            wavelengths=np.asarray([data.wavelengths for data in all_data]),
-            intensities=np.asarray([data.spectrum for data in all_data]),
-        )
+        if all_data:
+            self.data = ScanData(
+                positions=np.asarray([data.readback for data in all_data]),
+                wavelengths=np.asarray(all_data[-1].wavelengths),
+                intensities=np.asarray([data.spectrum for data in all_data]),
+            )
+
+        self.stage.move(initial_position, wait=False)
 
 
 @dataclasses.dataclass

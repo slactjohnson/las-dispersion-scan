@@ -537,20 +537,7 @@
           <double>10000000000.000000000000000</double>
          </property>
          <property name="value">
-          <double>100.000000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="8" column="1">
-        <widget class="QPushButton" name="scan_button">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>&amp;Start</string>
+          <double>20.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -870,12 +857,41 @@
          <property name="toolTip">
           <string/>
          </property>
+         <property name="showUnits" stdset="0">
+          <bool>true</bool>
+         </property>
         </widget>
        </item>
        <item row="2" column="2">
         <widget class="PyDMLabel" name="spectrometer_status_label">
          <property name="toolTip">
           <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="2">
+        <widget class="QPushButton" name="scan_button">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>&amp;Start scan</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="1">
+        <widget class="QPushButton" name="take_fundamental_button">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Take fundamental</string>
          </property>
         </widget>
        </item>
@@ -1129,7 +1145,6 @@
   <tabstop>scan_wavelength_high_spinbox</tabstop>
   <tabstop>scan_steps_spinbox</tabstop>
   <tabstop>dwell_time_spinbox</tabstop>
-  <tabstop>scan_button</tabstop>
   <tabstop>wedge_angle_spin</tabstop>
   <tabstop>blur_sigma_spinbox</tabstop>
   <tabstop>num_grid_points_spinbox</tabstop>

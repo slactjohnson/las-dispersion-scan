@@ -1,8 +1,10 @@
 import enum
+import logging
 import pathlib
 from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union
 
 import matplotlib.figure
+import matplotlib.pyplot as plt
 import numpy as np
 import pydm.widgets
 import typhos.related_display
@@ -14,6 +16,8 @@ from typhos.utils import raise_to_operator
 from . import dscan
 from . import loader as device_loader
 from . import options, plotting, utils
+
+logger = logging.getLogger(__name__)
 
 
 class _UiForm(Protocol):
@@ -128,6 +132,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
     # [mu, parameter, process_w, new_spectrum]
     new_scan_point: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanPointData)
+    scan_finished: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanData)
     retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult, list)
 
     # pypret / scan-related
@@ -136,7 +141,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     loader: device_loader.Loader
     devices: device_loader.Devices
     scan: Optional[dscan.AcquisitionScan]
-    scan_data: Optional[dscan.ScanData]
     _scan_thread: Optional[utils.ThreadWorker]
     _retrieval_thread: Optional[utils.ThreadWorker]
 
@@ -211,6 +215,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     stage_label: QtWidgets.QLabel
     stage_status_label: pydm.widgets.label.PyDMLabel
     stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
+    take_fundamental_button: QtWidgets.QPushButton
     start_pos_label: QtWidgets.QLabel
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
@@ -242,6 +247,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
         self.retrieval_update.connect(self._retrieval_partial_update)
+        self.take_fundamental_button.clicked.connect(self.take_fundamental)
+        self.scan_finished.connect(self._on_scan_finished)
 
         for radio in [
             self.time_radio,
@@ -267,6 +274,11 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.stage_suite_button.setText(stage.name)
         self.stage_suite_button.add_device(stage)
 
+        if stage.connected:
+            # TODO: this may be on a connection callback
+            self.scan_start_spinbox.setSuffix(f" {stage.egu}")
+            self.scan_end_spinbox.setSuffix(f" {stage.egu}")
+
         self.spectrometer_suite_button.setText(spectrometer.name)
         self.spectrometer_suite_button.add_device(spectrometer)
         self.setWindowTitle(f"D-scan Diagnostic ({status.prefix})")
@@ -287,6 +299,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.dscan_acquired_plot.setVisible(self.acquired_radio.isChecked())
         self.dscan_difference_plot.setVisible(self.difference_radio.isChecked())
         self.dscan_retrieved_plot.setVisible(self.retrieved_radio.isChecked())
+
+    @QtCore.Slot(object)
+    def _on_scan_finished(self, data: dscan.ScanData):
+        if self._retrieval_thread is not None:
+            return
+        self._start_retrieval()
 
     @QtCore.Slot(object, list)
     def _retrieval_partial_update(
@@ -318,7 +336,21 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         # )
         # self.reconstructed_time_plot.draw()
 
-    def load_path(self, path: Union[str, pathlib.Path]):
+    def take_fundamental(self) -> None:
+        if self.devices is None:
+            return
+
+        assert self.data is not None
+        self.data.fundamental = dscan.SpectrumData.from_device(
+            self.devices.spectrometer
+        )
+        _, ax = self.data.fundamental.plot()
+        stage = self.devices.stage
+        stage_pos = stage.user_readback.get()
+        ax.set_title(f"Fundamental spectrum at {stage_pos:.6f} {stage.egu}")
+        plt.show()
+
+    def load_path(self, path: Union[str, pathlib.Path]) -> None:
         """
         Load data from the provided path.
 
@@ -327,10 +359,18 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         """
         path = pathlib.Path(path).resolve()
         self.data = dscan.Acquisition.from_path(str(path))
+        self.save_to_npz("/Users/klauer/Repos/sim-ioc/simioc/ioc/dscan_sample.npz")
+
+    def save_to_npz(self, path: Union[str, pathlib.Path]):
+        if self.data is None:
+            return
+
+        self.data.settings = dict(**self.retrieval_parameters, **self.plot_parameters)
+        self.data.save(path)
 
     def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
         self.scan_status_label.setText(
-            f"Acquired [{data.index + 1}] at {data.readback} {data.position_units}"
+            f"Acquired [{data.index + 1}] at {data.readback * 1e-3} mm"
         )
 
     def _start_scan(self) -> None:
@@ -368,7 +408,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 raise_to_operator(ex)
                 return
 
-            self.scan_data = return_value
+            self.data.scan = return_value
+            self.scan_finished.emit(return_value)
 
         positions = np.linspace(
             start=self.scan_start_spinbox.value(),
@@ -410,9 +451,22 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 # In debug mode, we keep the numpy random seed consistent
                 # between retrieval runs
                 np.random.seed(0)
-            result = dscan.PypretResult.from_data(**self.retrieval_parameters)
-            self.pypret_result = result
-            result.run(callback=per_step_callback_in_thread)
+            try:
+                result = dscan.PypretResult.from_data(**self.retrieval_parameters)
+                self.pypret_result = result
+                result.run(callback=per_step_callback_in_thread)
+            except Exception as ex:
+                if self._debug:
+                    logger.warning(
+                        "Caught exception: %s. Starting debug mode IPython console.",
+                        ex,
+                        exc_info=True,
+                    )
+                    from IPython import embed
+
+                    embed()
+                raise
+
             return result
 
         def retrieval_finished(

@@ -115,8 +115,11 @@ def build_arg_parser(argparser=None):
 
     argparser.add_argument(
         "--debug",
-        type=str,
-        help=("Enable debug mode: numpy random seed set at each retrieval"),
+        action="store_true",
+        help=(
+            "Enable debug mode: numpy random seed set at each retrieval and "
+            "IPython console if the retrieval process raises"
+        ),
     )
 
     return argparser
