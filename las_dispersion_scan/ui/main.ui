@@ -7,15 +7,15 @@
     <x>0</x>
     <y>0</y>
     <width>985</width>
-    <height>778</height>
+    <height>912</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>D-scan Diagnostic</string>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout">
+  <layout class="QHBoxLayout" name="main_layout">
    <item>
-    <widget class="QSplitter" name="splitter">
+    <widget class="QSplitter" name="main_splitter">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
@@ -26,7 +26,7 @@
         <height>16777215</height>
        </size>
       </property>
-      <layout class="QGridLayout" name="gridLayout_3">
+      <layout class="QGridLayout" name="plot_grid_layout">
        <item row="24" column="1">
         <widget class="QLabel" name="plot_settings_label">
          <property name="sizePolicy">
@@ -173,7 +173,7 @@
        <item row="28" column="1" colspan="2">
         <widget class="QDoubleSpinBox" name="phase_blanking_threshold_spinbox">
          <property name="suffix">
-          <string> </string>
+          <string/>
          </property>
          <property name="decimals">
           <number>6</number>
@@ -895,10 +895,20 @@
          </property>
         </widget>
        </item>
+       <item row="7" column="0">
+        <widget class="QCheckBox" name="save_automatically_checkbox">
+         <property name="toolTip">
+          <string>Save scan data automatically (in npz format) to the specified directory</string>
+         </property>
+         <property name="text">
+          <string>Save automatically</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QFrame" name="right_frame">
-      <layout class="QVBoxLayout" name="verticalLayout">
+      <layout class="QVBoxLayout" name="right_frame_layout">
        <item>
         <widget class="QLabel" name="plot_label">
          <property name="sizePolicy">
@@ -953,7 +963,7 @@
        </item>
        <item>
         <widget class="QFrame" name="acquired_or_retrieved_frame">
-         <layout class="QHBoxLayout" name="time_frequency_frame_2">
+         <layout class="QHBoxLayout" name="acquired_or_retrieved_frame_layout">
           <item>
            <widget class="QRadioButton" name="acquired_radio">
             <property name="text">
@@ -1145,6 +1155,9 @@
   <tabstop>scan_wavelength_high_spinbox</tabstop>
   <tabstop>scan_steps_spinbox</tabstop>
   <tabstop>dwell_time_spinbox</tabstop>
+  <tabstop>save_automatically_checkbox</tabstop>
+  <tabstop>take_fundamental_button</tabstop>
+  <tabstop>scan_button</tabstop>
   <tabstop>wedge_angle_spin</tabstop>
   <tabstop>blur_sigma_spinbox</tabstop>
   <tabstop>num_grid_points_spinbox</tabstop>
@@ -1159,16 +1172,16 @@
   <tabstop>import_button</tabstop>
   <tabstop>export_button</tabstop>
   <tabstop>apply_limit_checkbox</tabstop>
-  <tabstop>oversampling_spinbox</tabstop>
   <tabstop>phase_blanking_checkbox</tabstop>
   <tabstop>phase_blanking_threshold_spinbox</tabstop>
+  <tabstop>oversampling_spinbox</tabstop>
   <tabstop>debug_mode_checkbox</tabstop>
+  <tabstop>replot_button</tabstop>
   <tabstop>acquired_radio</tabstop>
   <tabstop>retrieved_radio</tabstop>
   <tabstop>difference_radio</tabstop>
   <tabstop>time_radio</tabstop>
   <tabstop>frequency_radio</tabstop>
-  <tabstop>replot_button</tabstop>
   <tabstop>pulse_length_lineedit</tabstop>
   <tabstop>update_button</tabstop>
  </tabstops>

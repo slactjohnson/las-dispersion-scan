@@ -1,3 +1,4 @@
+import datetime
 import enum
 import logging
 import pathlib
@@ -134,6 +135,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     new_scan_point: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanPointData)
     scan_finished: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanData)
     retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult, list)
+    retrieval_finished: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult)
+    replotted: ClassVar[QtCore.Signal] = QtCore.Signal()
 
     # pypret / scan-related
     data: dscan.Acquisition
@@ -143,6 +146,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     scan: Optional[dscan.AcquisitionScan]
     _scan_thread: Optional[utils.ThreadWorker]
     _retrieval_thread: Optional[utils.ThreadWorker]
+    auto_save_path: Optional[pathlib.Path]
+    _scan_saved: bool
 
     # UI-derived widgets:
     acquired_or_retrieved_frame: QtWidgets.QFrame
@@ -197,6 +202,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     retrieved_radio: QtWidgets.QRadioButton
     retriever_settings_label: QtWidgets.QLabel
     right_frame: QtWidgets.QFrame
+    save_automatically_checkbox: QtWidgets.QCheckBox
     scan_button: QtWidgets.QPushButton
     scan_end_spinbox: QtWidgets.QDoubleSpinBox
     scan_start_spinbox: QtWidgets.QDoubleSpinBox
@@ -227,6 +233,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         parent: Optional[QtWidgets.QWidget] = None,
         loader: Optional[device_loader.Loader] = None,
         debug: bool = False,
+        auto_save_path: Optional[pathlib.Path] = None,
     ):
         super().__init__(parent=parent)
 
@@ -242,13 +249,19 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.saved_filename = None
         self._debug = debug
         self._retrieval_thread = None
+        self._scan_saved = False
         self._scan_thread = None
         self._export_menu = None
+        self.auto_save_path = auto_save_path
         self.data = dscan.Acquisition()
         self.update_button.clicked.connect(self._start_retrieval)
         self.replot_button.clicked.connect(self._update_plots)
-        self.retrieval_update.connect(self._retrieval_partial_update)
+        self.retrieval_update.connect(self._on_retrieval_partial_update)
+        self.retrieval_finished.connect(self._on_retrieval_finished)
         self.take_fundamental_button.clicked.connect(self.take_fundamental)
+        self.save_automatically_checkbox.toggled.connect(
+            self._save_automatically_checked
+        )
         self.scan_finished.connect(self._on_scan_finished)
 
         for radio in [
@@ -306,6 +319,21 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             title = f"{title}: {self.saved_filename}"
 
         self.setWindowTitle(title)
+
+    @QtCore.Slot(bool)
+    def _save_automatically_checked(self, checked: bool) -> None:
+        if checked:
+            if self.auto_save_path is None:
+                path = QtWidgets.QFileDialog.getExistingDirectory(
+                    self, "Directory to save files (dscan_*.npz; dscan_*.png)"
+                )
+                if path:
+                    self.auto_save_path = pathlib.Path(path)
+            if not self.auto_save_path:
+                self.save_automatically_checkbox.setChecked(False)
+                return
+        else:
+            self.auto_save_path = None
 
     def _switch_plot(self):
         self.reconstructed_time_plot.setVisible(self.time_radio.isChecked())
@@ -367,7 +395,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._start_retrieval()
 
     @QtCore.Slot(object, list)
-    def _retrieval_partial_update(
+    def _on_retrieval_partial_update(
         self, result: dscan.PypretResult, data: List[np.ndarray]
     ):
         ...
@@ -395,6 +423,43 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         #     phase_blanking_threshold=0.01,
         # )
         # self.reconstructed_time_plot.draw()
+
+    def get_autosave_date(self) -> str:
+        """Get an autosave filename suffix that includes the date/time."""
+        # Filename of the form:
+        # *2022-10-17T11_20_00_39000.npz
+        suffix = datetime.datetime.now().isoformat()
+        suffix = suffix.replace(":", "_")
+        suffix = suffix.replace(".", "_")
+        return suffix
+
+    @property
+    def should_auto_save(self) -> bool:
+        """Should the auto-save process happen after retrieval?"""
+        return self.save_automatically_checkbox.isChecked() and not self._scan_saved
+
+    @QtCore.Slot(object)
+    def _on_retrieval_finished(self, result: dscan.PypretResult):
+        """Slot when the retrieval process finishes."""
+        self._update_plots()
+        self.auto_save()
+
+    def auto_save(self) -> Optional[pathlib.Path]:
+        """Save the scan data and reconstruction plots."""
+        if not self.should_auto_save or self.auto_save_path is None:
+            return None
+
+        autosave_suffix = self.get_autosave_date()
+        path = self.auto_save_path / f"dscan_{autosave_suffix}.npz"
+        self._save_as_npz(filename=path)
+        self.reconstructed_time_plot.figure.savefig(
+            self.auto_save_path / f"dscan_time_{autosave_suffix}.png"
+        )
+        self.dscan_retrieved_plot.figure.savefig(
+            self.auto_save_path / f"dscan_retrieved_{autosave_suffix}.png"
+        )
+        self._scan_saved = True
+        return path
 
     def take_fundamental(self) -> None:
         if self.devices is None:
@@ -477,6 +542,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             stage=self.devices.stage, spectrometer=self.devices.spectrometer
         )
         self.scan_status_label.setText("Scan initialized...")
+        self._scan_saved = False
         self._scan_thread = utils.ThreadWorker(func=scan)
         self._scan_thread.returned.connect(scan_finished)
 
@@ -535,7 +601,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
             self.result = return_value
             self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
-            self._update_plots()
+            self.retrieval_finished.emit(self.pypret_result)
 
         self._retrieval_thread = utils.ThreadWorker(func=retrieval)
         self._retrieval_thread.returned.connect(retrieval_finished)
@@ -587,6 +653,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         for widget in widgets:
             widget.draw()
+
+        self.replotted.emit()
 
     @property
     def plot_parameters(self) -> Dict[str, Any]:
