@@ -8,13 +8,15 @@ Try:
 import argparse
 import importlib
 import logging
+import textwrap
+import traceback
 
 import las_dispersion_scan
 
-DESCRIPTION = __doc__
+DESCRIPTION = str(__doc__)
 
 
-MODULES = ("help",)
+MODULES = ("gui",)
 
 
 def _try_import(module):
@@ -30,8 +32,8 @@ def _build_commands():
     for module in sorted(MODULES):
         try:
             mod = _try_import(module)
-        except Exception as ex:
-            unavailable.append((module, ex))
+        except Exception:
+            unavailable.append((module, traceback.format_exc()))
         else:
             result[module] = (mod.build_arg_parser, mod.main)
             DESCRIPTION += f"\n    $ las-dispersion-scan {module} --help"
@@ -41,9 +43,9 @@ def _build_commands():
 
         for module, ex in unavailable:
             DESCRIPTION += (
-                f'\nWARNING: "las-dispersion-scan {module}" is unavailable due to:'
-                f"\n\t{ex.__class__.__name__}: {ex}"
+                f'\nWARNING: "las-dispersion-scan {module}" is unavailable due to:\n'
             )
+            DESCRIPTION += textwrap.indent(ex, prefix="\t")
 
     return result
 

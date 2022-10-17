@@ -1,0 +1,6 @@
+/*
+  vi: syntax=css
+*/
+
+QLabel#NameLabel {
+}
