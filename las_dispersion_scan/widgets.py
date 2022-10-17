@@ -357,6 +357,16 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         dat_export.triggered.connect(self._save_as_dat)
         self.export_button.setMenu(self._export_menu)
 
+    @property
+    def retrieval_is_running(self) -> bool:
+        """Is the retrieval thread running?"""
+        return self._retrieval_thread is not None and self._retrieval_thread.isRunning()
+
+    @property
+    def scan_is_running(self) -> bool:
+        """Is the scan thread running?"""
+        return self._scan_thread is not None and self._scan_thread.isRunning()
+
     def _save_as_dat(
         self, *, directory: Optional[Union[pathlib.Path, str]] = None
     ) -> Optional[pathlib.Path]:
@@ -393,9 +403,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     @QtCore.Slot(object)
     def _on_scan_finished(self, data: dscan.ScanData):
         self.scan_progress.setVisible(False)
-        if self._retrieval_thread is not None:
+        if self.retrieval_is_running:
             return
-
         if self.scan is not None and self.scan.stopped:
             return
 
@@ -535,7 +544,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
     def _start_scan(self) -> None:
         """Start a scan/acquisition to get spectra for the configured points."""
-        if self._scan_thread is not None:
+        if self.scan_is_running:
             if self.scan is not None:
                 self.scan.stop()
                 return
@@ -562,7 +571,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         ) -> None:
             self.scan_button.setText("&Start")
             self.scan_status_label.setText("Scan finished.")
-            self._scan_thread = None
 
             if return_value is None or ex is not None:
                 raise_to_operator(ex)
@@ -600,7 +608,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if self.data is None:
             raise ValueError("Data not acquired or loaded; cannot run retrieval")
 
-        if self._retrieval_thread is not None:
+        if self.retrieval_is_running:
             raise RuntimeError("Another retrieval is currently running")
 
         def per_step_callback_in_thread(data: List[np.ndarray]) -> None:
@@ -641,7 +649,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         ) -> None:
             self.update_button.setEnabled(True)
             self.replot_button.setEnabled(True)
-            self._retrieval_thread = None
 
             if return_value is None or ex is not None:
                 raise_to_operator(ex)
