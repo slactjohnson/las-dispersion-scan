@@ -636,7 +636,13 @@ class AcquisitionScan:
         self._stop = False
 
     def stop(self):
+        """Request to stop the scan."""
         self._stop = True
+
+    @property
+    def stopped(self) -> bool:
+        """Was the scan interrupted?"""
+        return self._stop
 
     def run(
         self,

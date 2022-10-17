@@ -134,7 +134,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     # [mu, parameter, process_w, new_spectrum]
     new_scan_point: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanPointData)
     scan_finished: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.ScanData)
-    retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult, list)
+    retrieval_update: ClassVar[QtCore.Signal] = QtCore.Signal(
+        dscan.PypretResult, int, list
+    )
     retrieval_finished: ClassVar[QtCore.Signal] = QtCore.Signal(dscan.PypretResult)
     replotted: ClassVar[QtCore.Signal] = QtCore.Signal()
 
@@ -200,11 +202,13 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     reconstructed_time_plot: PlotWidget
     replot_button: QtWidgets.QPushButton
     retrieved_radio: QtWidgets.QRadioButton
+    retrieval_progress: QtWidgets.QProgressBar
     retriever_settings_label: QtWidgets.QLabel
     right_frame: QtWidgets.QFrame
     save_automatically_checkbox: QtWidgets.QCheckBox
     scan_button: QtWidgets.QPushButton
     scan_end_spinbox: QtWidgets.QDoubleSpinBox
+    scan_progress: QtWidgets.QProgressBar
     scan_start_spinbox: QtWidgets.QDoubleSpinBox
     scan_status_label: QtWidgets.QLabel
     scan_steps_label: QtWidgets.QLabel
@@ -255,6 +259,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.auto_save_path = auto_save_path
         self.data = dscan.Acquisition()
         self.update_button.clicked.connect(self._start_retrieval)
+        self.import_button.clicked.connect(self._start_import)
         self.replot_button.clicked.connect(self._update_plots)
         self.retrieval_update.connect(self._on_retrieval_partial_update)
         self.retrieval_finished.connect(self._on_retrieval_finished)
@@ -275,6 +280,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         self.scan_button.clicked.connect(self._start_scan)
         self.new_scan_point.connect(self._on_new_scan_point)
+        self.retrieval_progress.setVisible(False)
+        self.scan_progress.setVisible(False)
         self._switch_plot()
         self._create_menus()
         self._connect_devices()
@@ -385,7 +392,11 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
     @QtCore.Slot(object)
     def _on_scan_finished(self, data: dscan.ScanData):
+        self.scan_progress.setVisible(False)
         if self._retrieval_thread is not None:
+            return
+
+        if self.scan is not None and self.scan.stopped:
             return
 
         if not len(self.data.fundamental.wavelengths):
@@ -394,12 +405,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         self._start_retrieval()
 
-    @QtCore.Slot(object, list)
+    @QtCore.Slot(object, int, list)
     def _on_retrieval_partial_update(
-        self, result: dscan.PypretResult, data: List[np.ndarray]
+        self, result: dscan.PypretResult, iteration: int, data: List[np.ndarray]
     ):
-        ...
-        # TODO: some sort of live view here
+        self.retrieval_progress.setValue(iteration)
+        # TODO: some sort of live view here?
         # mu, parameter, process_w, new_spectrum = data  # noqa
 
         # self.pulse_length_lineedit.setText(
@@ -441,6 +452,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     @QtCore.Slot(object)
     def _on_retrieval_finished(self, result: dscan.PypretResult):
         """Slot when the retrieval process finishes."""
+        self.retrieval_progress.setVisible(False)
         self._update_plots()
         self.auto_save()
 
@@ -486,7 +498,37 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.saved_filename = path
         self._update_title()
 
+    def _start_import(self) -> None:
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Import data",
+            ".",
+            ";;".join(
+                (
+                    "Numpy zip file (*.npz)",
+                    "Newer .dat file format (*.dat)",
+                    "Original text file format (*.txt)",
+                    "All files (*.*)",
+                )
+            ),
+        )
+        if not filename:
+            return
+
+        path = pathlib.Path(filename)
+        if path.suffix.lower() in (".dat", ".txt"):
+            logger.warning(
+                "Old Importing old file format: ignoring filename %s "
+                "The GUI will load either .dat or .txt from %s",
+                path.name,
+                path.parent,
+            )
+            path = path.parent
+
+        self.load_path(path)
+
     def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
+        self.scan_progress.setValue(data.index + 1)
         self.scan_status_label.setText(
             f"Acquired [{data.index + 1}] at {data.readback * 1e-3} mm"
         )
@@ -545,6 +587,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._scan_saved = False
         self._scan_thread = utils.ThreadWorker(func=scan)
         self._scan_thread.returned.connect(scan_finished)
+        self.scan_progress.setMinimum(0)
+        self.scan_progress.setValue(0)
+        self.scan_progress.setMaximum(self.scan_steps_spinbox.value())
+        self.scan_progress.setVisible(True)
 
         self.scan_button.setText("&Stop")
         self._scan_thread.start()
@@ -563,7 +609,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
             Do not do GUI operations here; subscribe to the signal instead.
             """
-            self.retrieval_update.emit(self.pypret_result, data)
+            nonlocal iteration
+            iteration += 1
+            self.retrieval_update.emit(self.pypret_result, iteration, data)
 
         def retrieval() -> dscan.PypretResult:
             if self._debug:
@@ -603,10 +651,15 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
             self.retrieval_finished.emit(self.pypret_result)
 
+        iteration = 0
         self._retrieval_thread = utils.ThreadWorker(func=retrieval)
         self._retrieval_thread.returned.connect(retrieval_finished)
         self.update_button.setEnabled(False)
         self.replot_button.setEnabled(False)
+        self.retrieval_progress.setMinimum(0)
+        self.retrieval_progress.setMaximum(self.iterations_spinbox.value())
+        self.retrieval_progress.setValue(0)
+        self.retrieval_progress.setVisible(True)
         self._retrieval_thread.start()
 
     def _update_plots(self) -> None:
