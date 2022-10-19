@@ -155,7 +155,7 @@
           <double>10000000000.000000000000000</double>
          </property>
          <property name="value">
-          <double>20.000000000000000</double>
+          <double>25.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -238,7 +238,7 @@
           <double>1000000.000000000000000</double>
          </property>
          <property name="value">
-          <double>200.000000000000000</double>
+          <double>350.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -284,7 +284,7 @@
           <double>100000.000000000000000</double>
          </property>
          <property name="value">
-          <double>400.000000000000000</double>
+          <double>700.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -338,7 +338,7 @@
           <double>10000000000.000000000000000</double>
          </property>
          <property name="value">
-          <double>0.000000000000000</double>
+          <double>23.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -654,7 +654,7 @@
           <double>100000.000000000000000</double>
          </property>
          <property name="value">
-          <double>300.000000000000000</double>
+          <double>450.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -673,7 +673,7 @@
           <double>1000000.000000000000000</double>
          </property>
          <property name="value">
-          <double>600.000000000000000</double>
+          <double>900.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -1136,14 +1136,14 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>PyDMLabel</class>
-   <extends>QLabel</extends>
-   <header>pydm.widgets.label</header>
-  </customwidget>
-  <customwidget>
    <class>TyphosRelatedSuiteButton</class>
    <extends>QPushButton</extends>
    <header>typhos.related_display</header>
+  </customwidget>
+  <customwidget>
+   <class>PyDMLabel</class>
+   <extends>QLabel</extends>
+   <header>pydm.widgets.label</header>
   </customwidget>
   <customwidget>
    <class>PlotWidget</class>
