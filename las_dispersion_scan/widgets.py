@@ -315,12 +315,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             )
 
     def _update_title(self) -> None:
-        if self.devices is not None:
-            prefix = self.devices.status.prefix
-        else:
-            prefix = None
+        title = "D-scan Diagnostic"
 
-        title = f"D-scan Diagnostic ({prefix})"
+        if self.devices is not None:
+            title = f"{title} ({self.devices.status.prefix})"
 
         if self.saved_filename is not None:
             title = f"{title}: {self.saved_filename}"
