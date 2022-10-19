@@ -212,7 +212,9 @@ class SpectrumData:
             cast(Sequence[float], device.spectrum.get())[: len(wavelengths)]
         )
         return cls(
-            wavelengths=wavelengths,
+            wavelengths=convert_to_meters(
+                wavelengths, getattr(device, "wavelength_units", "nm")
+            ),
             intensities=intensities,
         )
 
@@ -693,6 +695,15 @@ class AcquisitionScan:
                 stage=self.stage,
                 spectrometer=self.spectrometer,
             )
+            if np.sum(all_data[-1].spectrum) < 1e-6:
+                logger.warning(
+                    "Retrying scan point %d (%g); spectra zero" "point",
+                    idx,
+                    setpoint,
+                )
+                time.sleep(0.1)
+                continue
+
             if all_data and data.spectrum == all_data[-1].spectrum:
                 logger.warning(
                     "Retrying scan point %d (%g); spectra identical to previous "

@@ -2,7 +2,8 @@ import os
 
 import ophyd
 
-from ..devices import Qmini
+# from ..devices import Qmini
+from las_dispersion_scan.devices import Qmini
 
 qmini_prefix = os.environ.get("QMINI_PREFIX", "LAS:XCS:QMINI:01")
 stage_prefix = os.environ.get("MOTOR_PREFIX", "IOC:TST:motor")
