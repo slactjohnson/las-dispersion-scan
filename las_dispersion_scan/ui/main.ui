@@ -459,7 +459,7 @@
           <double>100000.000000000000000</double>
          </property>
          <property name="value">
-          <double>950.000000000000000</double>
+          <double>800.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -504,7 +504,7 @@
           <string>Save scan data automatically (in npz format) to the specified directory</string>
          </property>
          <property name="text">
-          <string>Save automatically</string>
+          <string>Auto save</string>
          </property>
         </widget>
        </item>
