@@ -317,7 +317,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     def _update_title(self) -> None:
         title = "D-scan Diagnostic"
 
-        if self.devices is not None:
+        if self.devices is not None and self.devices.status.prefix:
             title = f"{title} ({self.devices.status.prefix})"
 
         if self.saved_filename is not None:
@@ -537,7 +537,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
         self.scan_progress.setValue(data.index + 1)
         self.scan_status_label.setText(
-            f"Acquired [{data.index + 1}] at {data.readback * 1e-3} mm"
+            f"Acquired [{data.index + 1}] at {data.readback * 1e-3:.3g} mm"
         )
 
     def _start_scan(self) -> None:

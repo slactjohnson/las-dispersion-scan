@@ -695,7 +695,7 @@ class AcquisitionScan:
                 stage=self.stage,
                 spectrometer=self.spectrometer,
             )
-            if np.sum(all_data[-1].spectrum) < 1e-6:
+            if np.sum(data.spectrum) < 1e-6:
                 logger.warning(
                     "Retrying scan point %d (%g); spectra zero" "point",
                     idx,
