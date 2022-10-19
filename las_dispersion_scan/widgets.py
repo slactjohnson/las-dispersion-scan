@@ -93,7 +93,7 @@ class EnumComboBox(QtWidgets.QComboBox):
 
 
 class MaterialComboBox(EnumComboBox):
-    enum_default = options.Material.bk7
+    enum_default = options.Material.gratinga
 
 
 class NonlinearComboBox(EnumComboBox):
