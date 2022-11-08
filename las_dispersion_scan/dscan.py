@@ -696,6 +696,22 @@ class AcquisitionScan:
                 stage=self.stage,
                 spectrometer=self.spectrometer,
             )
+
+            spectra = [data.spectrum]
+
+            while not self._stop and len(spectra) < per_step_spectra:
+                spectrum = SpectrumData.from_device(
+                    self.spectrometer
+                ).intensities.tolist()
+
+                if spectrum == spectra[-1]:
+                    time.sleep(dwell_time)
+                    continue
+
+                spectra.append(spectrum)
+
+            data.spectrum = np.average(np.asarray(spectra), axis=0).tolist()
+
             if np.sum(data.spectrum) < 1e-6:
                 logger.warning(
                     "Retrying scan point %d (%g); spectra was all zero",
