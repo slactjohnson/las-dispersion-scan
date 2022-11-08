@@ -187,6 +187,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     oversampling_label: QtWidgets.QLabel
     oversampling_spinbox: QtWidgets.QSpinBox
     params_label: QtWidgets.QLabel
+    spectra_per_step_spinbox: QtWidgets.QSpinBox
     phase_blanking_checkbox: QtWidgets.QCheckBox
     phase_blanking_label: QtWidgets.QLabel
     phase_blanking_threshold_label: QtWidgets.QLabel
@@ -558,6 +559,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             for point in self.scan.run(
                 positions=list(positions),
                 dwell_time=dwell_time,
+                per_step_spectra=self.spectra_per_step_spinbox.value(),
             ):
                 self.new_scan_point.emit(point)
 

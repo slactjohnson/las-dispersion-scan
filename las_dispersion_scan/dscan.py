@@ -650,6 +650,7 @@ class AcquisitionScan:
         self,
         positions: List[float],
         dwell_time: float,
+        per_step_spectra: int = 1,
         timeout: float = 30.0,
     ) -> Generator[ScanPointData, None, None]:
         """
