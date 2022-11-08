@@ -66,6 +66,8 @@ class Qmini(qmini.QminiSpectrometer):
     spectrum = UCpt()
     wavelengths = UCpt()
 
+    wavelength_units = "nm"
+
     def stop(self):
         ...
 

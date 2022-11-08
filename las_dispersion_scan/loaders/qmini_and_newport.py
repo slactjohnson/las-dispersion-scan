@@ -23,5 +23,3 @@ else:
     Newport = pcdsdevices.epics_motor.Newport
 
 stage = Newport(stage_prefix, name=stage_name)
-
-spectrometer.wavelength_units = "nm"
