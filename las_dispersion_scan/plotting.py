@@ -181,7 +181,8 @@ class RetrievalResultPlot:
 
         fx = EngFormatter(unit="s")
         ax1.xaxis.set_major_formatter(fx)
-        ax1.set_title(f"time domain @ {self.final_position:.3f} mm (FWHM = {fwhm} fs)")
+        plot_position_mm = self.final_position * 1e3
+        ax1.set_title(f"time domain @ {plot_position_mm:.3f} mm (FWHM = {fwhm} fs)")
         ax1.set_xlabel("time")
         ax1.set_ylabel(yaxis.value)
         ax12.set_ylabel("phase (rad)")

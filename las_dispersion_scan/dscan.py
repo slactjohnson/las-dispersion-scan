@@ -697,7 +697,7 @@ class AcquisitionScan:
             )
             if np.sum(data.spectrum) < 1e-6:
                 logger.warning(
-                    "Retrying scan point %d (%g); spectra zero" "point",
+                    "Retrying scan point %d (%g); spectra was all zero",
                     idx,
                     setpoint,
                 )
@@ -979,9 +979,8 @@ class PypretResult:
 
         fx = EngFormatter(unit="s")
         ax1.xaxis.set_major_formatter(fx)
-        ax1.set_title(
-            f"time domain @ {self._final_plot_position:.3f} mm (FWHM = {fwhm} fs)"
-        )
+        plot_position_mm = self._final_plot_position * 1e3
+        ax1.set_title(f"time domain @ {plot_position_mm:.3f} mm (FWHM = {fwhm} fs)")
         ax1.set_xlabel("time")
         ax1.set_ylabel(yaxis.value)
         ax12.set_ylabel("phase (rad)")
@@ -1392,7 +1391,7 @@ class PypretResult:
 
     @property
     def _final_plot_position(self):
-        """Final plot position for RetrievalResultPlot"""
+        """Final plot position for RetrievalResultPlot, in meters."""
         if self.plot_position is None:
             return self.scan.positions[self.optimum_fwhm_idx]
         return self.plot_position
