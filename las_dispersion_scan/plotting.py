@@ -298,7 +298,7 @@ class RetrievalResultPlot:
                 ax.yaxis.set_major_formatter(fy)
 
             ax.set_title(title)
-            scan_padding = 75  # (nm)
+            scan_padding = 0  # (nm)
             ax.set_xlim(
                 [
                     2.99792 * 1e17 / (self.scan_range[1] - scan_padding),

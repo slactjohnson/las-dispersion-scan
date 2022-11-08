@@ -849,7 +849,7 @@ class PypretResult:
         )
 
     def plot_mesh_data(
-        self, data: Optional[pypret.MeshData] = None, scan_padding_nm: int = 75
+        self, data: Optional[pypret.MeshData] = None, scan_padding_nm: int = 0
     ) -> pypret.MeshDataPlot:
         """
         Plot the mesh scan data.
@@ -878,7 +878,7 @@ class PypretResult:
         return md
 
     def plot_processed_scan(
-        self, *, fig: Optional[plt.Figure] = None, scan_padding_nm: int = 75
+        self, *, fig: Optional[plt.Figure] = None, scan_padding_nm: int = 0
     ) -> pypret.MeshDataPlot:
         """
         Plot the processed mesh scan data from ``self.trace``.
@@ -1194,7 +1194,7 @@ class PypretResult:
             ax.yaxis.set_major_formatter(fy)
 
         ax.set_title(title)
-        scan_padding = 75  # (nm)
+        scan_padding = 0  # (nm)
         ax.set_xlim(
             2.99792 * 1e17 / (self.spec_scan_range[1] - scan_padding),
             2.99792 * 1e17 / (self.spec_scan_range[0] + scan_padding),
