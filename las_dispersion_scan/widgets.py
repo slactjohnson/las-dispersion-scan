@@ -2,7 +2,7 @@ import datetime
 import enum
 import logging
 import pathlib
-from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union, cast
 
 import matplotlib.figure
 import matplotlib.pyplot as plt
@@ -109,6 +109,8 @@ class SolverComboBox(EnumComboBox):
 
 
 class PlotWidget(FigureCanvasQTAgg):
+    figure: matplotlib.figure.Figure
+
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
@@ -122,6 +124,68 @@ class PlotWidget(FigureCanvasQTAgg):
 
         if parent is not None:
             self.setParent(parent)
+
+
+class SpectrumPlotWidget(PlotWidget):
+    def __init__(
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        width: int = 4,
+        height: int = 4,
+        dpi: int = 100,
+    ):
+        super().__init__(parent=parent, width=width, height=height, dpi=dpi)
+        self.hline = None
+        self._scan = None
+        self.cids = [
+            self.mpl_connect("motion_notify_event", self._mouse_move),
+            self.mpl_connect("button_release_event", self._mouse_release),
+        ]
+
+    @property
+    def scan(self) -> Optional[dscan.ScanData]:
+        """The current scan associated with the plot."""
+        return self._scan
+
+    @scan.setter
+    def scan(self, scan: Optional[dscan.ScanData]):
+        self._scan = scan
+        self.hline = None
+
+    def _mouse_release(self, event) -> Any:
+        if not event.inaxes or not self.scan:
+            return
+
+        closest_pos_idx = np.argmin(np.abs(event.ydata - self.scan.positions))
+        pos = self.scan.positions[closest_pos_idx] * 1e3
+
+        _, ax = plt.subplots()
+        ax = cast(plt.Axes, ax)
+        ax.plot(self.scan.wavelengths * 1e9, self.scan.intensities[closest_pos_idx])
+        ax.set_xlabel("Wavelength (nm)")
+        ax.set_ylabel("Counts (arb.)")
+        ax.set_title(f"Spectrum data at {pos:.3f} mm")
+        plt.show()
+
+    def _mouse_move(self, event) -> Any:
+        if not event.inaxes or not self.scan:
+            return
+
+        ax: plt.Axes = event.inaxes
+
+        closest_pos_idx = np.argmin(np.abs(event.ydata - self.scan.positions))
+        pos = self.scan.positions[closest_pos_idx]
+
+        if self.hline is None:
+            self.hline = ax.axhline(y=pos)
+        else:
+            new_ydata = [pos, pos]
+            if self.hline.get_ydata() == new_ydata:
+                return
+
+            self.hline.set_data([self.hline.get_xdata(), new_ydata])
+
+        self.draw()
 
 
 class DscanMain(DesignerDisplay, QtWidgets.QWidget):
@@ -163,9 +227,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     debug_mode_checkbox: QtWidgets.QCheckBox
     debug_mode_label: QtWidgets.QLabel
     difference_radio: QtWidgets.QRadioButton
-    dscan_acquired_plot: PlotWidget
-    dscan_difference_plot: PlotWidget
-    dscan_retrieved_plot: PlotWidget
+    dscan_acquired_plot: SpectrumPlotWidget
+    dscan_difference_plot: SpectrumPlotWidget
+    dscan_retrieved_plot: SpectrumPlotWidget
     dwell_time_label: QtWidgets.QLabel
     dwell_time_spinbox: QtWidgets.QDoubleSpinBox
     export_button: QtWidgets.QPushButton
@@ -684,6 +748,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         for widget in widgets:
             widget.figure.clear()
+
+        self.dscan_acquired_plot.scan = self.result.scan
+        self.dscan_retrieved_plot.scan = self.result.scan
+        self.dscan_difference_plot.scan = self.result.scan
 
         self.result.plot_trace(
             fig=self.dscan_acquired_plot.figure,

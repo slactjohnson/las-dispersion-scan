@@ -980,7 +980,7 @@
         </widget>
        </item>
        <item>
-        <widget class="PlotWidget" name="dscan_difference_plot" native="true">
+        <widget class="SpectrumPlotWidget" name="dscan_difference_plot" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
            <horstretch>0</horstretch>
@@ -990,7 +990,7 @@
         </widget>
        </item>
        <item>
-        <widget class="PlotWidget" name="dscan_retrieved_plot" native="true">
+        <widget class="SpectrumPlotWidget" name="dscan_retrieved_plot" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
            <horstretch>0</horstretch>
@@ -1000,7 +1000,7 @@
         </widget>
        </item>
        <item>
-        <widget class="PlotWidget" name="dscan_acquired_plot" native="true">
+        <widget class="SpectrumPlotWidget" name="dscan_acquired_plot" native="true">
          <property name="sizePolicy">
           <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
            <horstretch>0</horstretch>
@@ -1205,6 +1205,12 @@
    <class>SolverComboBox</class>
    <extends>QComboBox</extends>
    <header>las_dispersion_scan.widgets</header>
+  </customwidget>
+  <customwidget>
+   <class>SpectrumPlotWidget</class>
+   <extends>QWidget</extends>
+   <header>las_dispersion_scan.widgets</header>
+   <container>1</container>
   </customwidget>
  </customwidgets>
  <tabstops>
