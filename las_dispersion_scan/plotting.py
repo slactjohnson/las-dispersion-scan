@@ -101,6 +101,20 @@ def plot_complex_phase(
 
 @dataclasses.dataclass
 class RetrievalResultPlot:
+    """
+    This plot is only used for the "debug" mode.
+
+    It represents the original pypret-style plotting mechanism, with everything
+    summarized in one figure.
+
+    No effort was made to split/refactor these plots in this class. However,
+    the :class:`las_dispersion_scan.dscan.PypretResult` methods are separated
+    into individual plots.
+
+    This entire class can be considered deprecated, (if there even is such a
+    thing for a tool like this.)
+    """
+
     retrieval_result: RetrievalResultStandin
     retrieval_parameter: float
     fund_range: Tuple[float, float]

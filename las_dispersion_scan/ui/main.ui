@@ -987,6 +987,9 @@
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="plot_type" stdset="0">
+          <string>Difference</string>
+         </property>
         </widget>
        </item>
        <item>
@@ -997,6 +1000,9 @@
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="plot_type" stdset="0">
+          <string>Retrieved</string>
+         </property>
         </widget>
        </item>
        <item>
@@ -1006,6 +1012,9 @@
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="plot_type" stdset="0">
+          <string>Acquired</string>
          </property>
         </widget>
        </item>
@@ -1117,6 +1126,19 @@
          </property>
          <property name="invertedAppearance">
           <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="updating_plots_label">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Updating plots, please wait...</string>
          </property>
         </widget>
        </item>

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import enum
 import logging
@@ -5,6 +7,7 @@ import pathlib
 from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union, cast
 
 import matplotlib.figure
+import matplotlib.image
 import matplotlib.pyplot as plt
 import numpy as np
 import pydm.widgets
@@ -137,6 +140,7 @@ class SpectrumPlotWidget(PlotWidget):
         super().__init__(parent=parent, width=width, height=height, dpi=dpi)
         self.hline = None
         self._scan = None
+        self._plot_type = "Acquired"
         self.cids = [
             self.mpl_connect("motion_notify_event", self._mouse_move),
             self.mpl_connect("button_release_event", self._mouse_release),
@@ -152,8 +156,27 @@ class SpectrumPlotWidget(PlotWidget):
         self._scan = scan
         self.hline = None
 
+    @QtCore.Property(str)
+    def plot_type(self) -> str:
+        """This widget's plot type."""
+        return self._plot_type
+
+    @plot_type.setter
+    def plot_type(self, plot_type: str) -> None:
+        self._plot_type = plot_type
+
+    def _get_main_window(self) -> Optional[DscanMain]:
+        widget = self
+        while not isinstance(widget, DscanMain) and widget is not None:
+            widget = widget.parent()
+        return widget
+
     def _mouse_release(self, event) -> Any:
         if not event.inaxes or not self.scan:
+            return
+
+        main = self._get_main_window()
+        if main is None or main.result is None:
             return
 
         closest_pos_idx = np.argmin(np.abs(event.ydata - self.scan.positions))
@@ -161,10 +184,25 @@ class SpectrumPlotWidget(PlotWidget):
 
         _, ax = plt.subplots()
         ax = cast(plt.Axes, ax)
-        ax.plot(self.scan.wavelengths * 1e9, self.scan.intensities[closest_pos_idx])
+        ax.plot(
+            self.scan.wavelengths * 1e9,
+            self.scan.intensities[closest_pos_idx],
+            label="Acquired",
+        )
         ax.set_xlabel("Wavelength (nm)")
         ax.set_ylabel("Counts (arb.)")
         ax.set_title(f"Spectrum data at {pos:.3f} mm")
+        plt.show()
+
+        _, ax = plt.subplots()
+        ax = cast(plt.Axes, ax)
+        profile = main.result.result_profile.transpose()[closest_pos_idx]
+        ax.plot(
+            main.result.pulse.t * 1e15, profile / np.max(profile), label=self.plot_type
+        )
+        ax.set_xlabel("Time (fs)")
+        ax.set_ylabel("Intensity")
+        ax.set_title(f"Result profile at {pos:.3f} mm")
         plt.show()
 
     def _mouse_move(self, event) -> Any:
@@ -291,6 +329,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     stage_status_label: pydm.widgets.label.PyDMLabel
     stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
     take_fundamental_button: QtWidgets.QPushButton
+    updating_plots_label: QtWidgets.QLabel
     start_pos_label: QtWidgets.QLabel
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
@@ -345,6 +384,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         self.scan_button.clicked.connect(self._start_scan)
         self.new_scan_point.connect(self._on_new_scan_point)
+        self.updating_plots_label.setVisible(False)
         self.retrieval_progress.setVisible(False)
         self.scan_progress.setVisible(False)
         self._switch_plot()
@@ -738,6 +778,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if self.result is None:
             return
 
+        self.updating_plots_label.setVisible(True)
+
         widgets = [
             self.reconstructed_time_plot,
             self.reconstructed_frequency_plot,
@@ -749,40 +791,45 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         for widget in widgets:
             widget.figure.clear()
 
-        self.dscan_acquired_plot.scan = self.result.scan
-        self.dscan_retrieved_plot.scan = self.result.scan
-        self.dscan_difference_plot.scan = self.result.scan
+        self.update()
+        utils.process_events()
+        try:
+            self.dscan_acquired_plot.scan = self.result.scan
+            self.dscan_retrieved_plot.scan = self.result.scan
+            self.dscan_difference_plot.scan = self.result.scan
 
-        self.result.plot_trace(
-            fig=self.dscan_acquired_plot.figure,
-            option=plotting.PlotTrace.measured,
-        )
+            self.result.plot_trace(
+                fig=self.dscan_acquired_plot.figure,
+                option=plotting.PlotTrace.measured,
+            )
 
-        self.result.plot_trace(
-            fig=self.dscan_retrieved_plot.figure,
-            option=plotting.PlotTrace.retrieved,
-        )
+            self.result.plot_trace(
+                fig=self.dscan_retrieved_plot.figure,
+                option=plotting.PlotTrace.retrieved,
+            )
 
-        self.result.plot_trace(
-            fig=self.dscan_difference_plot.figure,
-            option=plotting.PlotTrace.difference,
-        )
+            self.result.plot_trace(
+                fig=self.dscan_difference_plot.figure,
+                option=plotting.PlotTrace.difference,
+            )
 
-        self.result.plot_frequency_domain_retrieval(
-            fig=self.reconstructed_frequency_plot.figure, **self.plot_parameters
-        )
+            self.result.plot_frequency_domain_retrieval(
+                fig=self.reconstructed_frequency_plot.figure, **self.plot_parameters
+            )
 
-        self.result.plot_time_domain_retrieval(
-            fig=self.reconstructed_time_plot.figure, **self.plot_parameters
-        )
+            self.result.plot_time_domain_retrieval(
+                fig=self.reconstructed_time_plot.figure, **self.plot_parameters
+            )
 
-        if self.debug_mode_checkbox.isChecked():
-            self.result.plot_all_debug(**self.plot_parameters)
+            if self.debug_mode_checkbox.isChecked():
+                self.result.plot_all_debug(**self.plot_parameters)
 
-        for widget in widgets:
-            widget.draw()
+            for widget in widgets:
+                widget.draw()
 
-        self.replotted.emit()
+            self.replotted.emit()
+        finally:
+            self.updating_plots_label.setVisible(False)
 
     @property
     def plot_parameters(self) -> Dict[str, Any]:
