@@ -289,7 +289,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     oversampling_label: QtWidgets.QLabel
     oversampling_spinbox: QtWidgets.QSpinBox
     params_label: QtWidgets.QLabel
-    spectra_per_step_spinbox: QtWidgets.QSpinBox
     phase_blanking_checkbox: QtWidgets.QCheckBox
     phase_blanking_label: QtWidgets.QLabel
     phase_blanking_threshold_label: QtWidgets.QLabel
@@ -304,11 +303,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     reconstructed_frequency_plot: PlotWidget
     reconstructed_time_plot: PlotWidget
     replot_button: QtWidgets.QPushButton
-    retrieved_radio: QtWidgets.QRadioButton
     retrieval_progress: QtWidgets.QProgressBar
+    retrieved_radio: QtWidgets.QRadioButton
     retriever_settings_label: QtWidgets.QLabel
     right_frame: QtWidgets.QFrame
     save_automatically_checkbox: QtWidgets.QCheckBox
+    save_plots_button: QtWidgets.QPushButton
     scan_button: QtWidgets.QPushButton
     scan_end_spinbox: QtWidgets.QDoubleSpinBox
     scan_progress: QtWidgets.QProgressBar
@@ -321,6 +321,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     scan_wavelength_low_spinbox: QtWidgets.QDoubleSpinBox
     solver_combo: SolverComboBox
     solver_label: QtWidgets.QLabel
+    spectra_per_step_spinbox: QtWidgets.QSpinBox
     spectrometer_label: QtWidgets.QLabel
     spectrometer_status_label: pydm.widgets.label.PyDMLabel
     spectrometer_suite_button: typhos.related_display.TyphosRelatedSuiteButton
@@ -328,11 +329,11 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     stage_label: QtWidgets.QLabel
     stage_status_label: pydm.widgets.label.PyDMLabel
     stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
-    take_fundamental_button: QtWidgets.QPushButton
-    updating_plots_label: QtWidgets.QLabel
     start_pos_label: QtWidgets.QLabel
+    take_fundamental_button: QtWidgets.QPushButton
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
+    updating_plots_label: QtWidgets.QLabel
     wedge_angle_label: QtWidgets.QLabel
     wedge_angle_spin: QtWidgets.QDoubleSpinBox
 
@@ -351,7 +352,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         else:
             self.devices = None
 
-        self.show_type_hints()
+        # self.show_type_hints()
         self.result = None
         self.acquisition_scan = None
         self.saved_filename = None
@@ -364,6 +365,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.data = dscan.Acquisition()
         self.update_button.clicked.connect(self._start_retrieval)
         self.import_button.clicked.connect(self._start_import)
+        self.save_plots_button.clicked.connect(self._save_plots)
         self.replot_button.clicked.connect(self._update_plots)
         self.retrieval_update.connect(self._on_retrieval_partial_update)
         self.retrieval_finished.connect(self._on_retrieval_finished)
@@ -482,9 +484,38 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         directory = pathlib.Path(directory)
         self.data.save(directory, format="dat")
+        self._save_plots(filename_base=directory)
         self.saved_filename = f"{directory}/*.dat"
         self._update_title()
         return directory
+
+    def _save_plots(
+        self, *, filename_base: Optional[Union[pathlib.Path, str]] = None
+    ) -> Optional[pathlib.Path]:
+        if filename_base is None:
+            filename_base, filter_ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save all plots", ".", "All files (*.*);;"
+            )
+            if not filename_base:
+                return
+
+        filename_base = pathlib.Path(filename_base).resolve()
+        filename_base = filename_base.with_name(filename_base.stem)
+        self.reconstructed_time_plot.figure.savefig(
+            f"{filename_base}_reconstructed_time.png", dpi=300
+        )
+        self.reconstructed_frequency_plot.figure.savefig(
+            f"{filename_base}_reconstructed_frequency.png", dpi=300
+        )
+        self.dscan_retrieved_plot.figure.savefig(
+            f"{filename_base}_retrieved.png", dpi=300
+        )
+        self.dscan_acquired_plot.figure.savefig(
+            f"{filename_base}_acquired.png", dpi=300
+        )
+        self.dscan_difference_plot.figure.savefig(
+            f"{filename_base}_difference.png", dpi=300
+        )
 
     def _save_as_npz(
         self, *, filename: Optional[Union[pathlib.Path, str]] = None
@@ -499,6 +530,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         filename = pathlib.Path(filename)
         self.data.settings = dict(**self.retrieval_parameters, **self.plot_parameters)
         self.data.save(filename, format="npz")
+        self._save_plots(filename_base=filename)
         self.saved_filename = filename
         self._update_title()
         return filename
@@ -576,12 +608,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         autosave_suffix = self.get_autosave_date()
         path = self.auto_save_path / f"dscan_{autosave_suffix}.npz"
         self._save_as_npz(filename=path)
-        self.reconstructed_time_plot.figure.savefig(
-            self.auto_save_path / f"dscan_time_{autosave_suffix}.png"
-        )
-        self.dscan_retrieved_plot.figure.savefig(
-            self.auto_save_path / f"dscan_retrieved_{autosave_suffix}.png"
-        )
         self._scan_saved = True
         return path
 

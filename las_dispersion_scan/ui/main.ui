@@ -27,42 +27,6 @@
        </size>
       </property>
       <layout class="QGridLayout" name="plot_grid_layout">
-       <item row="21" column="0">
-        <widget class="QLabel" name="center_banwidth_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Bandwidth around center wavelength for frequency and time axes (nm)</string>
-         </property>
-         <property name="text">
-          <string>Center bandwidth</string>
-         </property>
-         <property name="buddy">
-          <cstring>freq_bandwidth_spinbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
-        <widget class="PyDMLabel" name="spectrometer_status_label">
-         <property name="toolTip">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="30" column="1">
-        <widget class="QCheckBox" name="phase_blanking_checkbox">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
        <item row="20" column="0">
         <widget class="QLabel" name="fundamental_range_label">
          <property name="sizePolicy">
@@ -82,6 +46,108 @@
          </property>
         </widget>
        </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="start_pos_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Scan range</string>
+         </property>
+         <property name="buddy">
+          <cstring>scan_start_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="25" column="1" colspan="2">
+        <widget class="SolverComboBox" name="solver_combo"/>
+       </item>
+       <item row="0" column="0" colspan="3">
+        <widget class="QLabel" name="params_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Scan parameters</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="0" colspan="3">
+        <widget class="QProgressBar" name="scan_progress">
+         <property name="value">
+          <number>24</number>
+         </property>
+         <property name="textVisible">
+          <bool>true</bool>
+         </property>
+         <property name="invertedAppearance">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QDoubleSpinBox" name="scan_start_spinbox">
+         <property name="suffix">
+          <string> mm</string>
+         </property>
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="minimum">
+          <double>-10000000000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>10000000000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>23.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="30" column="1">
+        <widget class="QCheckBox" name="phase_blanking_checkbox">
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="21" column="0">
+        <widget class="QLabel" name="center_banwidth_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Bandwidth around center wavelength for frequency and time axes (nm)</string>
+         </property>
+         <property name="text">
+          <string>Center bandwidth</string>
+         </property>
+         <property name="buddy">
+          <cstring>freq_bandwidth_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
        <item row="8" column="0">
         <widget class="QLabel" name="dwell_time_label">
          <property name="sizePolicy">
@@ -98,13 +164,92 @@
          </property>
         </widget>
        </item>
-       <item row="1" column="1">
-        <widget class="TyphosRelatedSuiteButton" name="stage_suite_button">
-         <property name="toolTip">
-          <string/>
+       <item row="1" column="0">
+        <widget class="QLabel" name="stage_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
          </property>
          <property name="text">
-          <string>stage_name</string>
+          <string>Stage</string>
+         </property>
+         <property name="buddy">
+          <cstring>stage_suite_button</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="32" column="0">
+        <widget class="QLabel" name="debug_mode_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Phase blanking threshold</string>
+         </property>
+         <property name="text">
+          <string>Debug mode</string>
+         </property>
+         <property name="buddy">
+          <cstring>debug_mode_checkbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="25" column="0">
+        <widget class="QLabel" name="solver_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>The retriever solver to use. </string>
+         </property>
+         <property name="text">
+          <string>Solver</string>
+         </property>
+         <property name="buddy">
+          <cstring>solver_combo</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="31" column="1" colspan="2">
+        <widget class="QDoubleSpinBox" name="phase_blanking_threshold_spinbox">
+         <property name="suffix">
+          <string/>
+         </property>
+         <property name="decimals">
+          <number>6</number>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>100000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.010000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="scan_wavelength_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Wavelengths</string>
+         </property>
+         <property name="buddy">
+          <cstring>scan_wavelength_low_spinbox</cstring>
          </property>
         </widget>
        </item>
@@ -128,6 +273,228 @@
          </property>
         </widget>
        </item>
+       <item row="26" column="2">
+        <widget class="QPushButton" name="export_button">
+         <property name="toolTip">
+          <string>Export data to a file</string>
+         </property>
+         <property name="text">
+          <string>Export</string>
+         </property>
+        </widget>
+       </item>
+       <item row="24" column="1" colspan="2">
+        <widget class="PulseAnalysisComboBox" name="pulse_analysis_combo">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QSpinBox" name="scan_steps_spinbox">
+         <property name="minimum">
+          <number>5</number>
+         </property>
+         <property name="maximum">
+          <number>10000</number>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="1">
+        <widget class="QSpinBox" name="spectra_per_step_spinbox">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>100</number>
+         </property>
+         <property name="value">
+          <number>1</number>
+         </property>
+        </widget>
+       </item>
+       <item row="22" column="0">
+        <widget class="QLabel" name="material_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>The material used in the d-scan.
+</string>
+         </property>
+         <property name="text">
+          <string>Material</string>
+         </property>
+         <property name="buddy">
+          <cstring>material_combo</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="23" column="0">
+        <widget class="QLabel" name="nonlinear_process_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>The non-linear process to use
+</string>
+         </property>
+         <property name="text">
+          <string>Non-linear process</string>
+         </property>
+         <property name="buddy">
+          <cstring>nonlinear_combo</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="1" colspan="2">
+        <widget class="QSpinBox" name="blur_sigma_spinbox">
+         <property name="suffix">
+          <string> stdev</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="1">
+        <widget class="QDoubleSpinBox" name="dwell_time_spinbox">
+         <property name="suffix">
+          <string> sec</string>
+         </property>
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>0.100000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="19" column="0">
+        <widget class="QLabel" name="iterations_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Maximum number of iterations for the retriever</string>
+         </property>
+         <property name="text">
+          <string>Iterations</string>
+         </property>
+         <property name="buddy">
+          <cstring>iterations_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="scan_steps_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Scan steps</string>
+         </property>
+         <property name="buddy">
+          <cstring>scan_steps_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="32" column="1">
+        <widget class="QCheckBox" name="debug_mode_checkbox">
+         <property name="toolTip">
+          <string>Show all available debug plots in separate windows after pulse retrieval</string>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="PyDMLabel" name="stage_status_label">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="precision" stdset="0">
+          <number>3</number>
+         </property>
+         <property name="showUnits" stdset="0">
+          <bool>true</bool>
+         </property>
+         <property name="precisionFromPV" stdset="0">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="18" column="0">
+        <widget class="QLabel" name="grid_points_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Number of grid points in frequency and time axes.
+</string>
+         </property>
+         <property name="text">
+          <string>Grid points</string>
+         </property>
+         <property name="buddy">
+          <cstring>num_grid_points_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="20" column="2">
+        <widget class="QDoubleSpinBox" name="fundamental_high_spinbox">
+         <property name="suffix">
+          <string> nm</string>
+         </property>
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="minimum">
+          <double>0.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>1000000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>900.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="18" column="1" colspan="2">
+        <widget class="QSpinBox" name="num_grid_points_spinbox">
+         <property name="minimum">
+          <number>10</number>
+         </property>
+         <property name="maximum">
+          <number>100000</number>
+         </property>
+         <property name="value">
+          <number>3000</number>
+         </property>
+        </widget>
+       </item>
        <item row="20" column="1">
         <widget class="QDoubleSpinBox" name="fundamental_low_spinbox">
          <property name="suffix">
@@ -147,26 +514,42 @@
          </property>
         </widget>
        </item>
-       <item row="24" column="1" colspan="2">
-        <widget class="PulseAnalysisComboBox" name="pulse_analysis_combo">
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="0">
-        <widget class="QLabel" name="scan_wavelength_label">
+       <item row="29" column="0">
+        <widget class="QLabel" name="oversampling_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="toolTip">
+          <string>Oversampling</string>
+         </property>
          <property name="text">
-          <string>Wavelengths</string>
+          <string>Oversampling</string>
          </property>
          <property name="buddy">
-          <cstring>scan_wavelength_low_spinbox</cstring>
+          <cstring>oversampling_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="PyDMLabel" name="spectrometer_status_label">
+         <property name="toolTip">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QPushButton" name="take_fundamental_button">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Take fundamental</string>
          </property>
         </widget>
        </item>
@@ -192,35 +575,140 @@
          </property>
         </widget>
        </item>
-       <item row="32" column="1">
-        <widget class="QCheckBox" name="debug_mode_checkbox">
-         <property name="toolTip">
-          <string>Show all available debug plots in separate windows after pulse retrieval</string>
+       <item row="13" column="0" colspan="3">
+        <widget class="QLabel" name="scan_status_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
          </property>
          <property name="text">
-          <string/>
-         </property>
-         <property name="checked">
-          <bool>false</bool>
+          <string>Scan: not in progress</string>
          </property>
         </widget>
        </item>
-       <item row="4" column="2">
-        <widget class="QDoubleSpinBox" name="scan_wavelength_high_spinbox">
-         <property name="suffix">
-          <string> nm</string>
+       <item row="24" column="0">
+        <widget class="QLabel" name="pulse_analysis_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
          </property>
-         <property name="decimals">
-          <number>3</number>
+         <property name="toolTip">
+          <string>The pulse analysis method to use
+</string>
          </property>
+         <property name="text">
+          <string>Pulse analysis</string>
+         </property>
+         <property name="buddy">
+          <cstring>pulse_analysis_combo</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="0">
+        <widget class="QLabel" name="blur_sigma_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Strength of Gaussian blur applied to raw data (standard deviations).
+</string>
+         </property>
+         <property name="text">
+          <string>Blur sigma</string>
+         </property>
+         <property name="buddy">
+          <cstring>blur_sigma_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="2">
+        <widget class="QPushButton" name="scan_button">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>&amp;Start scan</string>
+         </property>
+        </widget>
+       </item>
+       <item row="29" column="1" colspan="2">
+        <widget class="QSpinBox" name="oversampling_spinbox">
          <property name="minimum">
-          <double>0.000000000000000</double>
+          <number>0</number>
          </property>
          <property name="maximum">
-          <double>100000.000000000000000</double>
+          <number>10000</number>
          </property>
          <property name="value">
-          <double>450.000000000000000</double>
+          <number>8</number>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="0">
+        <widget class="QCheckBox" name="save_automatically_checkbox">
+         <property name="toolTip">
+          <string>Save scan data automatically (in npz format) to the specified directory</string>
+         </property>
+         <property name="text">
+          <string>Auto save</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0">
+        <widget class="QLabel" name="per_step_spectra_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Per-step spectra</string>
+         </property>
+         <property name="buddy">
+          <cstring>scan_steps_spinbox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="19" column="1" colspan="2">
+        <widget class="QSpinBox" name="iterations_spinbox">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>10000</number>
+         </property>
+         <property name="value">
+          <number>30</number>
+         </property>
+        </widget>
+       </item>
+       <item row="30" column="0">
+        <widget class="QLabel" name="phase_blanking_label">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Enable phase blanking with pypret masking</string>
+         </property>
+         <property name="text">
+          <string>Phase blanking</string>
+         </property>
+         <property name="buddy">
+          <cstring>phase_blanking_checkbox</cstring>
          </property>
         </widget>
        </item>
@@ -243,206 +731,8 @@
          </property>
         </widget>
        </item>
-       <item row="17" column="1" colspan="2">
-        <widget class="QSpinBox" name="blur_sigma_spinbox">
-         <property name="suffix">
-          <string> stdev</string>
-         </property>
-        </widget>
-       </item>
-       <item row="12" column="0" colspan="3">
-        <widget class="QProgressBar" name="scan_progress">
-         <property name="value">
-          <number>24</number>
-         </property>
-         <property name="textVisible">
-          <bool>true</bool>
-         </property>
-         <property name="invertedAppearance">
-          <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="8" column="1">
-        <widget class="QDoubleSpinBox" name="dwell_time_spinbox">
-         <property name="suffix">
-          <string> sec</string>
-         </property>
-         <property name="decimals">
-          <number>3</number>
-         </property>
-         <property name="minimum">
-          <double>0.000000000000000</double>
-         </property>
-         <property name="maximum">
-          <double>1000000.000000000000000</double>
-         </property>
-         <property name="value">
-          <double>0.100000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="0">
-        <widget class="QLabel" name="scan_steps_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Scan steps</string>
-         </property>
-         <property name="buddy">
-          <cstring>scan_steps_spinbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="26" column="1">
-        <widget class="QPushButton" name="import_button">
-         <property name="toolTip">
-          <string>Import data from previous scans</string>
-         </property>
-         <property name="text">
-          <string>Import</string>
-         </property>
-        </widget>
-       </item>
-       <item row="34" column="1">
-        <spacer name="left_spacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="26" column="2">
-        <widget class="QPushButton" name="export_button">
-         <property name="toolTip">
-          <string>Export data to a file</string>
-         </property>
-         <property name="text">
-          <string>Export</string>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="0">
-        <widget class="QCheckBox" name="save_automatically_checkbox">
-         <property name="toolTip">
-          <string>Save scan data automatically (in npz format) to the specified directory</string>
-         </property>
-         <property name="text">
-          <string>Auto save</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="2">
-        <widget class="QDoubleSpinBox" name="scan_end_spinbox">
-         <property name="suffix">
-          <string> mm</string>
-         </property>
-         <property name="decimals">
-          <number>3</number>
-         </property>
-         <property name="minimum">
-          <double>-10000000000.000000000000000</double>
-         </property>
-         <property name="maximum">
-          <double>10000000000.000000000000000</double>
-         </property>
-         <property name="value">
-          <double>25.000000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="32" column="0">
-        <widget class="QLabel" name="debug_mode_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Phase blanking threshold</string>
-         </property>
-         <property name="text">
-          <string>Debug mode</string>
-         </property>
-         <property name="buddy">
-          <cstring>debug_mode_checkbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="spectrometer_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Spectrometer</string>
-         </property>
-         <property name="buddy">
-          <cstring>spectrometer_suite_button</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="1">
-        <widget class="QDoubleSpinBox" name="scan_wavelength_low_spinbox">
-         <property name="suffix">
-          <string> nm</string>
-         </property>
-         <property name="decimals">
-          <number>3</number>
-         </property>
-         <property name="minimum">
-          <double>0.000000000000000</double>
-         </property>
-         <property name="maximum">
-          <double>1000000.000000000000000</double>
-         </property>
-         <property name="value">
-          <double>350.000000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="1">
-        <widget class="QSpinBox" name="scan_steps_spinbox">
-         <property name="minimum">
-          <number>5</number>
-         </property>
-         <property name="maximum">
-          <number>10000</number>
-         </property>
-        </widget>
-       </item>
-       <item row="18" column="0">
-        <widget class="QLabel" name="grid_points_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Number of grid points in frequency and time axes.
-</string>
-         </property>
-         <property name="text">
-          <string>Grid points</string>
-         </property>
-         <property name="buddy">
-          <cstring>num_grid_points_spinbox</cstring>
-         </property>
-        </widget>
+       <item row="23" column="1" colspan="2">
+        <widget class="NonlinearComboBox" name="nonlinear_combo"/>
        </item>
        <item row="28" column="0">
         <widget class="QLabel" name="apply_limit_label">
@@ -464,87 +754,22 @@
          </property>
         </widget>
        </item>
-       <item row="19" column="0">
-        <widget class="QLabel" name="iterations_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+       <item row="21" column="1" colspan="2">
+        <widget class="QDoubleSpinBox" name="freq_bandwidth_spinbox">
+         <property name="suffix">
+          <string> nm</string>
          </property>
-         <property name="toolTip">
-          <string>Maximum number of iterations for the retriever</string>
+         <property name="decimals">
+          <number>3</number>
          </property>
-         <property name="text">
-          <string>Iterations</string>
-         </property>
-         <property name="buddy">
-          <cstring>iterations_spinbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="29" column="1" colspan="2">
-        <widget class="QSpinBox" name="oversampling_spinbox">
          <property name="minimum">
-          <number>0</number>
+          <double>0.000000000000000</double>
          </property>
          <property name="maximum">
-          <number>10000</number>
+          <double>100000.000000000000000</double>
          </property>
          <property name="value">
-          <number>8</number>
-         </property>
-        </widget>
-       </item>
-       <item row="23" column="0">
-        <widget class="QLabel" name="nonlinear_process_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>The non-linear process to use
-</string>
-         </property>
-         <property name="text">
-          <string>Non-linear process</string>
-         </property>
-         <property name="buddy">
-          <cstring>nonlinear_combo</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="18" column="1" colspan="2">
-        <widget class="QSpinBox" name="num_grid_points_spinbox">
-         <property name="minimum">
-          <number>10</number>
-         </property>
-         <property name="maximum">
-          <number>100000</number>
-         </property>
-         <property name="value">
-          <number>3000</number>
-         </property>
-        </widget>
-       </item>
-       <item row="22" column="1" colspan="2">
-        <widget class="MaterialComboBox" name="material_combo"/>
-       </item>
-       <item row="23" column="1" colspan="2">
-        <widget class="NonlinearComboBox" name="nonlinear_combo"/>
-       </item>
-       <item row="9" column="2">
-        <widget class="QPushButton" name="scan_button">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>&amp;Start scan</string>
+          <double>800.000000000000000</double>
          </property>
         </widget>
        </item>
@@ -558,96 +783,19 @@
          </property>
         </widget>
        </item>
-       <item row="9" column="1">
-        <widget class="QPushButton" name="take_fundamental_button">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Take fundamental</string>
-         </property>
-        </widget>
-       </item>
-       <item row="16" column="1" colspan="2">
-        <widget class="QDoubleSpinBox" name="wedge_angle_spin">
-         <property name="suffix">
-          <string> deg</string>
-         </property>
-         <property name="decimals">
-          <number>5</number>
-         </property>
-         <property name="minimum">
-          <double>-360.000000000000000</double>
-         </property>
-         <property name="maximum">
-          <double>360.000000000000000</double>
-         </property>
-         <property name="value">
-          <double>8.000000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="25" column="0">
-        <widget class="QLabel" name="solver_label">
+       <item row="2" column="0">
+        <widget class="QLabel" name="spectrometer_label">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
-         <property name="toolTip">
-          <string>The retriever solver to use. </string>
-         </property>
          <property name="text">
-          <string>Solver</string>
+          <string>Spectrometer</string>
          </property>
          <property name="buddy">
-          <cstring>solver_combo</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="33" column="2">
-        <widget class="QPushButton" name="replot_button">
-         <property name="toolTip">
-          <string>Export data to a file</string>
-         </property>
-         <property name="text">
-          <string>Replot</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="0" colspan="3">
-        <widget class="QLabel" name="params_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="font">
-          <font>
-           <weight>75</weight>
-           <bold>true</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Scan parameters</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="TyphosRelatedSuiteButton" name="spectrometer_suite_button">
-         <property name="toolTip">
-          <string/>
-         </property>
-         <property name="text">
-          <string>spectrometer_name</string>
+          <cstring>spectrometer_suite_button</cstring>
          </property>
         </widget>
        </item>
@@ -673,153 +821,8 @@
          </property>
         </widget>
        </item>
-       <item row="19" column="1" colspan="2">
-        <widget class="QSpinBox" name="iterations_spinbox">
-         <property name="minimum">
-          <number>1</number>
-         </property>
-         <property name="maximum">
-          <number>10000</number>
-         </property>
-         <property name="value">
-          <number>30</number>
-         </property>
-        </widget>
-       </item>
-       <item row="29" column="0">
-        <widget class="QLabel" name="oversampling_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Oversampling</string>
-         </property>
-         <property name="text">
-          <string>Oversampling</string>
-         </property>
-         <property name="buddy">
-          <cstring>oversampling_spinbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="2">
-        <widget class="PyDMLabel" name="stage_status_label">
-         <property name="toolTip">
-          <string/>
-         </property>
-         <property name="precision" stdset="0">
-          <number>3</number>
-         </property>
-         <property name="showUnits" stdset="0">
-          <bool>true</bool>
-         </property>
-         <property name="precisionFromPV" stdset="0">
-          <bool>false</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="22" column="0">
-        <widget class="QLabel" name="material_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>The material used in the d-scan.
-</string>
-         </property>
-         <property name="text">
-          <string>Material</string>
-         </property>
-         <property name="buddy">
-          <cstring>material_combo</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="stage_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Stage</string>
-         </property>
-         <property name="buddy">
-          <cstring>stage_suite_button</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="1">
-        <widget class="QDoubleSpinBox" name="scan_start_spinbox">
-         <property name="suffix">
-          <string> mm</string>
-         </property>
-         <property name="decimals">
-          <number>3</number>
-         </property>
-         <property name="minimum">
-          <double>-10000000000.000000000000000</double>
-         </property>
-         <property name="maximum">
-          <double>10000000000.000000000000000</double>
-         </property>
-         <property name="value">
-          <double>23.000000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="24" column="0">
-        <widget class="QLabel" name="pulse_analysis_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>The pulse analysis method to use
-</string>
-         </property>
-         <property name="text">
-          <string>Pulse analysis</string>
-         </property>
-         <property name="buddy">
-          <cstring>pulse_analysis_combo</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="25" column="1" colspan="2">
-        <widget class="SolverComboBox" name="solver_combo"/>
-       </item>
-       <item row="30" column="0">
-        <widget class="QLabel" name="phase_blanking_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Enable phase blanking with pypret masking</string>
-         </property>
-         <property name="text">
-          <string>Phase blanking</string>
-         </property>
-         <property name="buddy">
-          <cstring>phase_blanking_checkbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="20" column="2">
-        <widget class="QDoubleSpinBox" name="fundamental_high_spinbox">
+       <item row="4" column="1">
+        <widget class="QDoubleSpinBox" name="scan_wavelength_low_spinbox">
          <property name="suffix">
           <string> nm</string>
          </property>
@@ -833,12 +836,22 @@
           <double>1000000.000000000000000</double>
          </property>
          <property name="value">
-          <double>900.000000000000000</double>
+          <double>350.000000000000000</double>
          </property>
         </widget>
        </item>
-       <item row="21" column="1" colspan="2">
-        <widget class="QDoubleSpinBox" name="freq_bandwidth_spinbox">
+       <item row="26" column="1">
+        <widget class="QPushButton" name="import_button">
+         <property name="toolTip">
+          <string>Import data from previous scans</string>
+         </property>
+         <property name="text">
+          <string>Import</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="2">
+        <widget class="QDoubleSpinBox" name="scan_wavelength_high_spinbox">
          <property name="suffix">
           <string> nm</string>
          </property>
@@ -852,104 +865,117 @@
           <double>100000.000000000000000</double>
          </property>
          <property name="value">
-          <double>800.000000000000000</double>
+          <double>450.000000000000000</double>
          </property>
         </widget>
        </item>
-       <item row="17" column="0">
-        <widget class="QLabel" name="blur_sigma_label">
+       <item row="1" column="1">
+        <widget class="TyphosRelatedSuiteButton" name="stage_suite_button">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="text">
+          <string>stage_name</string>
+         </property>
+        </widget>
+       </item>
+       <item row="22" column="1" colspan="2">
+        <widget class="MaterialComboBox" name="material_combo"/>
+       </item>
+       <item row="34" column="1">
+        <spacer name="left_spacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="16" column="1" colspan="2">
+        <widget class="QDoubleSpinBox" name="wedge_angle_spin">
+         <property name="suffix">
+          <string> deg</string>
+         </property>
+         <property name="decimals">
+          <number>5</number>
+         </property>
+         <property name="minimum">
+          <double>-360.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>360.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>8.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="2">
+        <widget class="QDoubleSpinBox" name="scan_end_spinbox">
+         <property name="suffix">
+          <string> mm</string>
+         </property>
+         <property name="decimals">
+          <number>3</number>
+         </property>
+         <property name="minimum">
+          <double>-10000000000.000000000000000</double>
+         </property>
+         <property name="maximum">
+          <double>10000000000.000000000000000</double>
+         </property>
+         <property name="value">
+          <double>25.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="TyphosRelatedSuiteButton" name="spectrometer_suite_button">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="text">
+          <string>spectrometer_name</string>
+         </property>
+        </widget>
+       </item>
+       <item row="33" column="2">
+        <widget class="QPushButton" name="save_plots_button">
+         <property name="toolTip">
+          <string>Export data to a file</string>
+         </property>
+         <property name="text">
+          <string>Save plots</string>
+         </property>
+        </widget>
+       </item>
+       <item row="26" column="0">
+        <widget class="QPushButton" name="update_button">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+          <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
          <property name="toolTip">
-          <string>Strength of Gaussian blur applied to raw data (standard deviations).
-</string>
+          <string>Recalculate using the current retriever settings</string>
          </property>
          <property name="text">
-          <string>Blur sigma</string>
-         </property>
-         <property name="buddy">
-          <cstring>blur_sigma_spinbox</cstring>
+          <string>Recalculate</string>
          </property>
         </widget>
        </item>
-       <item row="13" column="0" colspan="3">
-        <widget class="QLabel" name="scan_status_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+       <item row="33" column="0">
+        <widget class="QPushButton" name="replot_button">
+         <property name="toolTip">
+          <string>Export data to a file</string>
          </property>
          <property name="text">
-          <string>Scan: not in progress</string>
-         </property>
-        </widget>
-       </item>
-       <item row="31" column="1" colspan="2">
-        <widget class="QDoubleSpinBox" name="phase_blanking_threshold_spinbox">
-         <property name="suffix">
-          <string/>
-         </property>
-         <property name="decimals">
-          <number>6</number>
-         </property>
-         <property name="minimum">
-          <double>0.000000000000000</double>
-         </property>
-         <property name="maximum">
-          <double>100000.000000000000000</double>
-         </property>
-         <property name="value">
-          <double>0.010000000000000</double>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="start_pos_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Scan range</string>
-         </property>
-         <property name="buddy">
-          <cstring>scan_start_spinbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="per_step_spectra_label">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Per-step spectra</string>
-         </property>
-         <property name="buddy">
-          <cstring>scan_steps_spinbox</cstring>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="1">
-        <widget class="QSpinBox" name="spectra_per_step_spinbox">
-         <property name="minimum">
-          <number>1</number>
-         </property>
-         <property name="maximum">
-          <number>100</number>
-         </property>
-         <property name="value">
-          <number>1</number>
+          <string>Replot</string>
          </property>
         </widget>
        </item>
@@ -1167,22 +1193,6 @@
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="QPushButton" name="update_button">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="toolTip">
-            <string>Recalculate using the current retriever settings</string>
-           </property>
-           <property name="text">
-            <string>Recalculate</string>
-           </property>
-          </widget>
-         </item>
         </layout>
        </item>
       </layout>
@@ -1259,6 +1269,7 @@
   <tabstop>nonlinear_combo</tabstop>
   <tabstop>pulse_analysis_combo</tabstop>
   <tabstop>solver_combo</tabstop>
+  <tabstop>update_button</tabstop>
   <tabstop>import_button</tabstop>
   <tabstop>export_button</tabstop>
   <tabstop>apply_limit_checkbox</tabstop>
@@ -1267,13 +1278,13 @@
   <tabstop>oversampling_spinbox</tabstop>
   <tabstop>debug_mode_checkbox</tabstop>
   <tabstop>replot_button</tabstop>
+  <tabstop>save_plots_button</tabstop>
   <tabstop>acquired_radio</tabstop>
   <tabstop>retrieved_radio</tabstop>
   <tabstop>difference_radio</tabstop>
   <tabstop>time_radio</tabstop>
   <tabstop>frequency_radio</tabstop>
   <tabstop>pulse_length_lineedit</tabstop>
-  <tabstop>update_button</tabstop>
  </tabstops>
  <resources/>
  <connections/>
