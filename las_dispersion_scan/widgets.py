@@ -256,6 +256,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     # UI-derived widgets:
     acquired_or_retrieved_frame: QtWidgets.QFrame
     acquired_radio: QtWidgets.QRadioButton
+    auto_fundamental_checkbox: QtWidgets.QCheckBox
     apply_limit_checkbox: QtWidgets.QCheckBox
     apply_limit_label: QtWidgets.QLabel
     blur_sigma_label: QtWidgets.QLabel
@@ -535,17 +536,36 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._update_title()
         return filename
 
+    @staticmethod
+    def _set_fundamental(data: dscan.Acquisition):
+        """
+        Automatically set the fundamental spectrum from the acquisition data.
+
+        Uses (approximately) the center scan position.
+        """
+        mid_position = len(data.scan.intensities) // 2
+        logger.warning(
+            "Setting fundamental spectra from the scan position: %.3f mm",
+            data.scan.positions[mid_position] * 1e3,  # m -> mm
+        )
+        intensities = data.scan.intensities[mid_position, :].copy()
+        data.fundamental.wavelengths = data.scan.wavelengths
+        data.fundamental.intensities = intensities
+
     @QtCore.Slot(object)
     def _on_scan_finished(self, data: dscan.ScanData):
+        """Scan finished callback slot."""
         self.scan_progress.setVisible(False)
         if self.retrieval_is_running:
             return
         if self.scan is not None and self.scan.stopped:
             return
 
-        if not len(self.data.fundamental.wavelengths):
-            self.data.fundamental.wavelengths = data.wavelengths
-            self.data.fundamental.intensities = data.intensities[0, :]
+        if (
+            not len(self.data.fundamental.wavelengths)
+            or self.auto_fundamental_checkbox.isChecked()
+        ):
+            self._set_fundamental(self.data)
 
         self._start_retrieval()
 
@@ -553,6 +573,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     def _on_retrieval_partial_update(
         self, result: dscan.PypretResult, iteration: int, data: List[np.ndarray]
     ):
+        """Retrieval process iteration callback slot."""
         self.retrieval_progress.setValue(iteration)
         # TODO: some sort of live view here?
         # mu, parameter, process_w, new_spectrum = data  # noqa

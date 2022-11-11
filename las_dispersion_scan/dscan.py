@@ -1492,7 +1492,7 @@ class PypretResult:
         -------
         PypretResult
         """
-        return PypretResult(
+        return cls(
             fund=copy.deepcopy(fund),
             scan=copy.deepcopy(scan),
             material=material,
