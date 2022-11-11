@@ -407,7 +407,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._create_menus()
         self._connect_devices()
         self._update_title()
-        self._load_settings()
+        try:
+            self._load_settings()
+        except Exception:
+            logger.exception("Failed to load settings")
 
     def _connect_devices(self) -> None:
         if self.devices is None:
@@ -448,14 +451,66 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.setWindowTitle(title)
 
     def closeEvent(self, event: QtCore.QEvent):
-        self._save_settings()
-        super().closeEvent(event)
+        try:
+            self._save_settings()
+        except Exception:
+            logger.exception("Failed to save settings")
+        finally:
+            super().closeEvent(event)
+
+    @property
+    def settings(self) -> QtCore.QSettings:
+        """The Qt settings object for storing parameters between launches."""
+        app = QtWidgets.QApplication.instance()
+        if app.organizationName() and app.applicationName():
+            return QtCore.QSettings()
+        return QtCore.QSettings(
+            "SLAC National Accelerator Laboratory",
+            "las-dispersion-scan",
+        )
 
     def _save_settings(self):
-        ...
+        """Save settings for the next launch."""
+        groups = {
+            "scan": self.scan_parameters,
+            "retrieval": self.retrieval_parameters,
+            "plot": self.plot_parameters,
+        }
+
+        # groups["retrieval"].pop("fund")
+        # groups["retrieval"].pop("scan")
+
+        settings = self.settings
+        for group, params in groups.items():
+            settings.beginGroup(group)
+            for key, value in params.items():
+                if isinstance(value, enum.Enum):
+                    value = value.value
+                settings.setValue(key, value)
+            settings.endGroup()
+
+    def _get_settings_group(self, group: str) -> Dict[str, Any]:
+        """Get QSettings group as a dictionary."""
+        settings = self.settings
+        settings.beginGroup(group)
+        return {key: settings.value(key, None) for key in settings.childKeys()}
 
     def _load_settings(self):
-        ...
+        """Load settings from the previous launch."""
+        try:
+            self.scan_parameters = self._get_settings_group("scan")
+        except Exception:
+            logger.warning("Failed to load scan parameters", exc_info=True)
+
+        try:
+            self.retrieval_parameters = self._get_settings_group("retrieval")
+        except Exception:
+            logger.warning("Failed to load retrieval parameters", exc_info=True)
+
+        try:
+            self.plot_parameters = self._get_settings_group("plot")
+        except Exception:
+            logger.warning("Failed to load plot parameters", exc_info=True)
 
     @QtCore.Slot(bool)
     def _save_automatically_checked(self, checked: bool) -> None:
@@ -837,6 +892,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 self.plot_position_spinbox.setValue(
                     self.result._final_plot_position * 1e3  # m -> mm
                 )
+
+            try:
+                self._save_settings()
+            except Exception:
+                logger.warning("Failed to save application settings: %s", ex)
+
             self.retrieval_finished.emit(self.pypret_result)
 
         iteration = 0
@@ -916,7 +977,23 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             stop=self.scan_end_spinbox.value(),
             num=self.scan_steps_spinbox.value(),
             dwell_time=self.dwell_time_spinbox.value(),
-            auto_fundamental=self.auto_fundamental_checkbox.value(),
+            auto_fundamental=self.auto_fundamental_checkbox.isChecked(),
+            per_step_spectra=self.spectra_per_step_spinbox.value(),
+        )
+
+    @scan_parameters.setter
+    def scan_parameters(self, parameters: Dict[str, Any]):
+        self._load_value_to_widget(self.scan_start_spinbox, parameters.get("start"))
+        self._load_value_to_widget(self.scan_end_spinbox, parameters.get("stop"))
+        self._load_value_to_widget(self.scan_steps_spinbox, parameters.get("num"))
+        self._load_value_to_widget(
+            self.dwell_time_spinbox, parameters.get("dwell_time")
+        )
+        self._load_value_to_widget(
+            self.auto_fundamental_checkbox, parameters.get("auto_fundamental")
+        )
+        self._load_value_to_widget(
+            self.spectra_per_step_spinbox, parameters.get("per_step_spectra")
         )
 
     @property
@@ -927,6 +1004,20 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             oversampling=self.oversampling_spinbox.value(),
             phase_blanking=self.phase_blanking_checkbox.isChecked(),
             phase_blanking_threshold=self.phase_blanking_threshold_spinbox.value(),
+        )
+
+    @plot_parameters.setter
+    def plot_parameters(self, parameters: Dict[str, Any]):
+        self._load_value_to_widget(self.apply_limit_checkbox, parameters.get("limit"))
+        self._load_value_to_widget(
+            self.oversampling_spinbox, parameters.get("oversampling")
+        )
+        self._load_value_to_widget(
+            self.phase_blanking_checkbox, parameters.get("phase_blanking")
+        )
+        self._load_value_to_widget(
+            self.phase_blanking_threshold_spinbox,
+            parameters.get("phase_blanking_threshold"),
         )
 
     def _validate_retrieval_parameters(self):
@@ -980,3 +1071,64 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             ),
             plot_position=plot_position,
         )
+
+    @retrieval_parameters.setter
+    def retrieval_parameters(self, parameters: Dict[str, Any]):
+        self._load_value_to_widget(self.material_combo, parameters.get("material"))
+        self._load_value_to_widget(self.pulse_analysis_combo, parameters.get("method"))
+        self._load_value_to_widget(self.nonlinear_combo, parameters.get("nlin_process"))
+        self._load_value_to_widget(self.wedge_angle_spin, parameters.get("wedge_angle"))
+        self._load_value_to_widget(
+            self.blur_sigma_spinbox, parameters.get("blur_sigma")
+        )
+        self._load_value_to_widget(
+            self.num_grid_points_spinbox, parameters.get("num_grid_points")
+        )
+        self._load_value_to_widget(
+            self.freq_bandwidth_spinbox, parameters.get("freq_bandwidth_wl")
+        )
+        self._load_value_to_widget(self.iterations_spinbox, parameters.get("max_iter"))
+        self._load_value_to_widget(
+            self.plot_position_spinbox, parameters.get("plot_position")
+        )
+
+        low, high = parameters.get("spec_fund_range", None) or [None, None]
+        self._load_value_to_widget(self.fundamental_low_spinbox, low)
+        self._load_value_to_widget(self.fundamental_high_spinbox, high)
+
+        low, high = parameters.get("spec_scan_range", None) or [None, None]
+        self._load_value_to_widget(self.scan_wavelength_low_spinbox, low)
+        self._load_value_to_widget(self.scan_wavelength_high_spinbox, high)
+
+    def _load_value_to_widget(self, widget: QtWidgets.QWidget, value: Any) -> None:
+        """
+        Update a widget with a value from QSettings.
+
+        Parameters
+        ----------
+        widget : QtWidgets.QWidget
+            The widget to update.
+        value : Any
+            The value from QSettings.
+        """
+        if value is None:
+            return
+
+        if isinstance(widget, QtWidgets.QCheckBox):
+            widget.setChecked(bool(value))
+        elif isinstance(widget, QtWidgets.QComboBox):
+            items = [widget.itemText(idx) for idx in range(widget.count())]
+            try:
+                index = items.index(str(value))
+            except ValueError:
+                ...
+            else:
+                widget.setCurrentIndex(index)
+        elif isinstance(widget, QtWidgets.QLineEdit):
+            widget.setText(str(value))
+        elif isinstance(widget, QtWidgets.QDoubleSpinBox):
+            widget.setValue(float(value))
+        elif isinstance(widget, QtWidgets.QSpinBox):
+            widget.setValue(int(value))
+        else:
+            logger.warning("Unhandled value loading widget: %s", widget)
