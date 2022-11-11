@@ -194,16 +194,16 @@ class SpectrumPlotWidget(PlotWidget):
         ax.set_title(f"Spectrum data at {pos:.3f} mm")
         plt.show()
 
-        _, ax = plt.subplots()
-        ax = cast(plt.Axes, ax)
-        profile = main.result.result_profile.transpose()[closest_pos_idx]
-        ax.plot(
-            main.result.pulse.t * 1e15, profile / np.max(profile), label=self.plot_type
-        )
-        ax.set_xlabel("Time (fs)")
-        ax.set_ylabel("Intensity")
-        ax.set_title(f"Result profile at {pos:.3f} mm")
-        plt.show()
+        # _, ax = plt.subplots()
+        # ax = cast(plt.Axes, ax)
+        # profile = main.result.result_profile.transpose()[closest_pos_idx]
+        # ax.plot(
+        #     main.result.pulse.t * 1e15, profile / np.max(profile), label=self.plot_type
+        # )
+        # ax.set_xlabel("Time (fs)")
+        # ax.set_ylabel("Intensity")
+        # ax.set_title(f"Result profile at {pos:.3f} mm")
+        # plt.show()
 
     def _mouse_move(self, event) -> Any:
         if not event.inaxes or not self.scan:
@@ -255,10 +255,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
     # UI-derived widgets:
     acquired_or_retrieved_frame: QtWidgets.QFrame
+    acquired_or_retrieved_frame_layout: QtWidgets.QHBoxLayout
     acquired_radio: QtWidgets.QRadioButton
-    auto_fundamental_checkbox: QtWidgets.QCheckBox
     apply_limit_checkbox: QtWidgets.QCheckBox
     apply_limit_label: QtWidgets.QLabel
+    auto_fundamental_checkbox: QtWidgets.QCheckBox
+    auto_fundamental_label: QtWidgets.QLabel
     blur_sigma_label: QtWidgets.QLabel
     blur_sigma_spinbox: QtWidgets.QSpinBox
     calculated_pulse_length_label: QtWidgets.QLabel
@@ -282,6 +284,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     iterations_label: QtWidgets.QLabel
     iterations_spinbox: QtWidgets.QSpinBox
     left_frame: QtWidgets.QFrame
+    main_layout: QtWidgets.QHBoxLayout
+    main_splitter: QtWidgets.QSplitter
     material_combo: MaterialComboBox
     material_label: QtWidgets.QLabel
     nonlinear_combo: NonlinearComboBox
@@ -290,11 +294,16 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     oversampling_label: QtWidgets.QLabel
     oversampling_spinbox: QtWidgets.QSpinBox
     params_label: QtWidgets.QLabel
+    per_step_spectra_label: QtWidgets.QLabel
     phase_blanking_checkbox: QtWidgets.QCheckBox
     phase_blanking_label: QtWidgets.QLabel
     phase_blanking_threshold_label: QtWidgets.QLabel
     phase_blanking_threshold_spinbox: QtWidgets.QDoubleSpinBox
+    plot_grid_layout: QtWidgets.QGridLayout
     plot_label: QtWidgets.QLabel
+    plot_position_auto_checkbox: QtWidgets.QCheckBox
+    plot_position_label: QtWidgets.QLabel
+    plot_position_spinbox: QtWidgets.QDoubleSpinBox
     plot_settings_label: QtWidgets.QLabel
     pulse_analysis_combo: PulseAnalysisComboBox
     pulse_analysis_label: QtWidgets.QLabel
@@ -308,7 +317,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     retrieved_radio: QtWidgets.QRadioButton
     retriever_settings_label: QtWidgets.QLabel
     right_frame: QtWidgets.QFrame
+    right_frame_layout: QtWidgets.QVBoxLayout
     save_automatically_checkbox: QtWidgets.QCheckBox
+    save_automatically_label: QtWidgets.QLabel
     save_plots_button: QtWidgets.QPushButton
     scan_button: QtWidgets.QPushButton
     scan_end_spinbox: QtWidgets.QDoubleSpinBox
@@ -332,6 +343,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
     start_pos_label: QtWidgets.QLabel
     take_fundamental_button: QtWidgets.QPushButton
+    time_frequency_frame: QtWidgets.QHBoxLayout
+    time_or_frequency_frame: QtWidgets.QFrame
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
     updating_plots_label: QtWidgets.QLabel
@@ -394,6 +407,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._create_menus()
         self._connect_devices()
         self._update_title()
+        self._load_settings()
 
     def _connect_devices(self) -> None:
         if self.devices is None:
@@ -432,6 +446,16 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             title = f"{title}: {self.saved_filename}"
 
         self.setWindowTitle(title)
+
+    def closeEvent(self, event: QtCore.QEvent):
+        self._save_settings()
+        super().closeEvent(event)
+
+    def _save_settings(self):
+        ...
+
+    def _load_settings(self):
+        ...
 
     @QtCore.Slot(bool)
     def _save_automatically_checked(self, checked: bool) -> None:
@@ -778,9 +802,11 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 # between retrieval runs
                 np.random.seed(0)
             try:
-                result = dscan.PypretResult.from_data(**self.retrieval_parameters)
-                self.pypret_result = result
-                result.run(callback=per_step_callback_in_thread)
+                self._validate_retrieval_parameters()
+                self.pypret_result = dscan.PypretResult.from_data(
+                    **self.retrieval_parameters
+                )
+                self.pypret_result.run(callback=per_step_callback_in_thread)
             except Exception as ex:
                 if self._debug:
                     logger.warning(
@@ -793,7 +819,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                     embed()
                 raise
 
-            return result
+            return self.pypret_result
 
         def retrieval_finished(
             return_value: Optional[dscan.PypretResult], ex: Optional[Exception]
@@ -807,6 +833,10 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
             self.result = return_value
             self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
+            if self.plot_position_auto_checkbox.isChecked():
+                self.plot_position_spinbox.setValue(
+                    self.result._final_plot_position * 1e3  # m -> mm
+                )
             self.retrieval_finished.emit(self.pypret_result)
 
         iteration = 0
@@ -879,6 +909,17 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             self.updating_plots_label.setVisible(False)
 
     @property
+    def scan_parameters(self) -> Dict[str, Any]:
+        """Parameters that specify a scan."""
+        return dict(
+            start=self.scan_start_spinbox.value(),
+            stop=self.scan_end_spinbox.value(),
+            num=self.scan_steps_spinbox.value(),
+            dwell_time=self.dwell_time_spinbox.value(),
+            auto_fundamental=self.auto_fundamental_checkbox.value(),
+        )
+
+    @property
     def plot_parameters(self) -> Dict[str, Any]:
         """Parameters to be passed to ``PypretResult.plot*`` methods."""
         return dict(
@@ -888,9 +929,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             phase_blanking_threshold=self.phase_blanking_threshold_spinbox.value(),
         )
 
-    @property
-    def retrieval_parameters(self) -> Dict[str, Any]:
-        """Parameters to be passed to ``PypretResult.from_data``."""
+    def _validate_retrieval_parameters(self):
+        """Check the retrieval parameters for consistency."""
         if (
             self.fundamental_low_spinbox.value()
             >= self.fundamental_high_spinbox.value()
@@ -911,6 +951,14 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 "value."
             )
 
+    @property
+    def retrieval_parameters(self) -> Dict[str, Any]:
+        """Parameters to be passed to ``PypretResult.from_data``."""
+        if self.plot_position_auto_checkbox.isChecked():
+            plot_position = None
+        else:
+            plot_position = self.plot_position_spinbox.value()
+
         return dict(
             fund=self.data.fundamental,
             scan=self.data.scan,
@@ -930,5 +978,5 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 self.scan_wavelength_low_spinbox.value(),
                 self.scan_wavelength_high_spinbox.value(),
             ),
-            plot_position=None,  # TODO
+            plot_position=plot_position,
         )

@@ -1411,7 +1411,7 @@ class PypretResult:
         """Final plot position for RetrievalResultPlot, in meters."""
         if self.plot_position is None:
             return self.scan.positions[self.optimum_fwhm_idx]
-        return self.plot_position
+        return self.plot_position * 1e-3
 
     def _get_retrieval_plot(self) -> RetrievalResultPlot:
         """
