@@ -63,7 +63,11 @@
         </widget>
        </item>
        <item row="25" column="1" colspan="2">
-        <widget class="SolverComboBox" name="solver_combo"/>
+        <widget class="SolverComboBox" name="solver_combo">
+         <property name="toolTip">
+          <string>Retriever solver to use</string>
+         </property>
+        </widget>
        </item>
        <item row="0" column="0" colspan="3">
         <widget class="QLabel" name="params_label">
@@ -102,6 +106,9 @@
        </item>
        <item row="3" column="1">
         <widget class="QDoubleSpinBox" name="scan_start_spinbox">
+         <property name="toolTip">
+          <string>Starting stage (motor) position</string>
+         </property>
          <property name="suffix">
           <string> mm</string>
          </property>
@@ -276,7 +283,7 @@
        <item row="26" column="2">
         <widget class="QPushButton" name="export_button">
          <property name="toolTip">
-          <string>Export data to a file</string>
+          <string>Export data to a file (or .dat files)</string>
          </property>
          <property name="text">
           <string>Export</string>
@@ -292,6 +299,9 @@
        </item>
        <item row="5" column="1">
         <widget class="QSpinBox" name="scan_steps_spinbox">
+         <property name="toolTip">
+          <string>Number of steps over the scan range (calculated by np.linspace)</string>
+         </property>
          <property name="minimum">
           <number>5</number>
          </property>
@@ -302,6 +312,9 @@
        </item>
        <item row="6" column="1">
         <widget class="QSpinBox" name="spectra_per_step_spinbox">
+         <property name="toolTip">
+          <string>Each step, take this number of spectra and use the average</string>
+         </property>
          <property name="minimum">
           <number>1</number>
          </property>
@@ -362,6 +375,9 @@
        </item>
        <item row="8" column="1">
         <widget class="QDoubleSpinBox" name="dwell_time_spinbox">
+         <property name="toolTip">
+          <string>Wait this amount of time at each scan point before acquiring data from the spectrometer</string>
+         </property>
          <property name="suffix">
           <string> sec</string>
          </property>
@@ -548,6 +564,9 @@
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="toolTip">
+          <string>Take a new fundamental spectrum, overriding the previous.  Defaults to the middle scan point if not separately acquired.</string>
+         </property>
          <property name="text">
           <string>Take fundamental</string>
          </property>
@@ -635,6 +654,9 @@
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="toolTip">
+          <string>Scan the stage with the above parameters</string>
          </property>
          <property name="text">
           <string>&amp;Start scan</string>
@@ -823,6 +845,9 @@
        </item>
        <item row="4" column="1">
         <widget class="QDoubleSpinBox" name="scan_wavelength_low_spinbox">
+         <property name="toolTip">
+          <string>Lower scan wavelength</string>
+         </property>
          <property name="suffix">
           <string> nm</string>
          </property>
@@ -852,6 +877,9 @@
        </item>
        <item row="4" column="2">
         <widget class="QDoubleSpinBox" name="scan_wavelength_high_spinbox">
+         <property name="toolTip">
+          <string>Upper scan wavelength</string>
+         </property>
          <property name="suffix">
           <string> nm</string>
          </property>
@@ -872,7 +900,7 @@
        <item row="1" column="1">
         <widget class="TyphosRelatedSuiteButton" name="stage_suite_button">
          <property name="toolTip">
-          <string/>
+          <string>Open a typhos screen for the stage</string>
          </property>
          <property name="text">
           <string>stage_name</string>
@@ -916,6 +944,9 @@
        </item>
        <item row="3" column="2">
         <widget class="QDoubleSpinBox" name="scan_end_spinbox">
+         <property name="toolTip">
+          <string>Final, inclusive stage position</string>
+         </property>
          <property name="suffix">
           <string> mm</string>
          </property>
@@ -936,7 +967,7 @@
        <item row="2" column="1">
         <widget class="TyphosRelatedSuiteButton" name="spectrometer_suite_button">
          <property name="toolTip">
-          <string/>
+          <string>Open a typhos screen for the spectrometer</string>
          </property>
          <property name="text">
           <string>spectrometer_name</string>
@@ -946,7 +977,7 @@
        <item row="33" column="2">
         <widget class="QPushButton" name="save_plots_button">
          <property name="toolTip">
-          <string>Export data to a file</string>
+          <string>Save plots to image files</string>
          </property>
          <property name="text">
           <string>Save plots</string>
@@ -972,7 +1003,7 @@
        <item row="33" column="0">
         <widget class="QPushButton" name="replot_button">
          <property name="toolTip">
-          <string>Export data to a file</string>
+          <string>Update plots with the above parameters</string>
          </property>
          <property name="text">
           <string>Replot</string>
