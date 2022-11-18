@@ -11,7 +11,7 @@ import pypret
 import pypret.frequencies
 import scipy
 import scipy.interpolate
-from qtpy import QtCore
+from qtpy import QtCore, QtWidgets
 
 SOURCE_PATH = pathlib.Path(__file__).resolve().parent
 
@@ -231,3 +231,10 @@ class ThreadWorker(QtCore.QThread):
             self.returned.emit(None, ex)
         else:
             self.returned.emit(self.return_value, None)
+
+
+def process_events(*, count: int = 100):
+    """Process Qt events."""
+    app = QtWidgets.QApplication.instance()
+    for _ in range(count):
+        app.processEvents()

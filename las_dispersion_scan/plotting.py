@@ -101,6 +101,20 @@ def plot_complex_phase(
 
 @dataclasses.dataclass
 class RetrievalResultPlot:
+    """
+    This plot is only used for the "debug" mode.
+
+    It represents the original pypret-style plotting mechanism, with everything
+    summarized in one figure.
+
+    No effort was made to split/refactor these plots in this class. However,
+    the :class:`las_dispersion_scan.dscan.PypretResult` methods are separated
+    into individual plots.
+
+    This entire class can be considered deprecated, (if there even is such a
+    thing for a tool like this.)
+    """
+
     retrieval_result: RetrievalResultStandin
     retrieval_parameter: float
     fund_range: Tuple[float, float]
@@ -181,7 +195,8 @@ class RetrievalResultPlot:
 
         fx = EngFormatter(unit="s")
         ax1.xaxis.set_major_formatter(fx)
-        ax1.set_title(f"time domain @ {self.final_position:.3f} mm (FWHM = {fwhm} fs)")
+        plot_position_mm = self.final_position * 1e3
+        ax1.set_title(f"time domain @ {plot_position_mm:.3f} mm (FWHM = {fwhm} fs)")
         ax1.set_xlabel("time")
         ax1.set_ylabel(yaxis.value)
         ax12.set_ylabel("phase (rad)")
@@ -297,7 +312,7 @@ class RetrievalResultPlot:
                 ax.yaxis.set_major_formatter(fy)
 
             ax.set_title(title)
-            scan_padding = 75  # (nm)
+            scan_padding = 0  # (nm)
             ax.set_xlim(
                 [
                     2.99792 * 1e17 / (self.scan_range[1] - scan_padding),

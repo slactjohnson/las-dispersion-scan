@@ -188,6 +188,9 @@ def main(
         logger.warning("Unable to select the qt5 backend for matplotlib", exc_info=True)
     plt.ion()
 
+    app.setOrganizationName("SLAC National Accelerator Laboratory")
+    app.setApplicationName("las-dispersion-scan")
+
     loader = Loader(
         script=script,
         stage=stage,

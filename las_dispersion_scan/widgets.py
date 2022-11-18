@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import datetime
 import enum
 import logging
 import pathlib
-from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Protocol, Type, Union, cast
 
 import matplotlib.figure
+import matplotlib.image
 import matplotlib.pyplot as plt
 import numpy as np
 import pydm.widgets
@@ -93,7 +96,7 @@ class EnumComboBox(QtWidgets.QComboBox):
 
 
 class MaterialComboBox(EnumComboBox):
-    enum_default = options.Material.bk7
+    enum_default = options.Material.gratinga
 
 
 class NonlinearComboBox(EnumComboBox):
@@ -109,6 +112,8 @@ class SolverComboBox(EnumComboBox):
 
 
 class PlotWidget(FigureCanvasQTAgg):
+    figure: matplotlib.figure.Figure
+
     def __init__(
         self,
         parent: Optional[QtWidgets.QWidget] = None,
@@ -122,6 +127,103 @@ class PlotWidget(FigureCanvasQTAgg):
 
         if parent is not None:
             self.setParent(parent)
+
+
+class SpectrumPlotWidget(PlotWidget):
+    def __init__(
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        width: int = 4,
+        height: int = 4,
+        dpi: int = 100,
+    ):
+        super().__init__(parent=parent, width=width, height=height, dpi=dpi)
+        self.hline = None
+        self._scan = None
+        self._plot_type = "Acquired"
+        self.cids = [
+            self.mpl_connect("motion_notify_event", self._mouse_move),
+            self.mpl_connect("button_release_event", self._mouse_release),
+        ]
+
+    @property
+    def scan(self) -> Optional[dscan.ScanData]:
+        """The current scan associated with the plot."""
+        return self._scan
+
+    @scan.setter
+    def scan(self, scan: Optional[dscan.ScanData]):
+        self._scan = scan
+        self.hline = None
+
+    @QtCore.Property(str)
+    def plot_type(self) -> str:
+        """This widget's plot type."""
+        return self._plot_type
+
+    @plot_type.setter
+    def plot_type(self, plot_type: str) -> None:
+        self._plot_type = plot_type
+
+    def _get_main_window(self) -> Optional[DscanMain]:
+        widget = self
+        while not isinstance(widget, DscanMain) and widget is not None:
+            widget = widget.parent()
+        return widget
+
+    def _mouse_release(self, event) -> Any:
+        if not event.inaxes or not self.scan:
+            return
+
+        main = self._get_main_window()
+        if main is None or main.result is None:
+            return
+
+        closest_pos_idx = np.argmin(np.abs(event.ydata - self.scan.positions))
+        pos = self.scan.positions[closest_pos_idx] * 1e3
+
+        _, ax = plt.subplots()
+        ax = cast(plt.Axes, ax)
+        ax.plot(
+            self.scan.wavelengths * 1e9,
+            self.scan.intensities[closest_pos_idx],
+            label="Acquired",
+        )
+        ax.set_xlabel("Wavelength (nm)")
+        ax.set_ylabel("Counts (arb.)")
+        ax.set_title(f"Spectrum data at {pos:.3f} mm")
+        plt.show()
+
+        # _, ax = plt.subplots()
+        # ax = cast(plt.Axes, ax)
+        # profile = main.result.result_profile.transpose()[closest_pos_idx]
+        # ax.plot(
+        #     main.result.pulse.t * 1e15, profile / np.max(profile), label=self.plot_type
+        # )
+        # ax.set_xlabel("Time (fs)")
+        # ax.set_ylabel("Intensity")
+        # ax.set_title(f"Result profile at {pos:.3f} mm")
+        # plt.show()
+
+    def _mouse_move(self, event) -> Any:
+        if not event.inaxes or not self.scan:
+            return
+
+        ax: plt.Axes = event.inaxes
+
+        closest_pos_idx = np.argmin(np.abs(event.ydata - self.scan.positions))
+        pos = self.scan.positions[closest_pos_idx]
+
+        if self.hline is None:
+            self.hline = ax.axhline(y=pos)
+        else:
+            new_ydata = [pos, pos]
+            if self.hline.get_ydata() == new_ydata:
+                return
+
+            self.hline.set_data([self.hline.get_xdata(), new_ydata])
+
+        self.draw()
 
 
 class DscanMain(DesignerDisplay, QtWidgets.QWidget):
@@ -153,9 +255,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
     # UI-derived widgets:
     acquired_or_retrieved_frame: QtWidgets.QFrame
+    acquired_or_retrieved_frame_layout: QtWidgets.QHBoxLayout
     acquired_radio: QtWidgets.QRadioButton
     apply_limit_checkbox: QtWidgets.QCheckBox
     apply_limit_label: QtWidgets.QLabel
+    auto_fundamental_checkbox: QtWidgets.QCheckBox
+    auto_fundamental_label: QtWidgets.QLabel
     blur_sigma_label: QtWidgets.QLabel
     blur_sigma_spinbox: QtWidgets.QSpinBox
     calculated_pulse_length_label: QtWidgets.QLabel
@@ -163,9 +268,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     debug_mode_checkbox: QtWidgets.QCheckBox
     debug_mode_label: QtWidgets.QLabel
     difference_radio: QtWidgets.QRadioButton
-    dscan_acquired_plot: PlotWidget
-    dscan_difference_plot: PlotWidget
-    dscan_retrieved_plot: PlotWidget
+    dscan_acquired_plot: SpectrumPlotWidget
+    dscan_difference_plot: SpectrumPlotWidget
+    dscan_retrieved_plot: SpectrumPlotWidget
     dwell_time_label: QtWidgets.QLabel
     dwell_time_spinbox: QtWidgets.QDoubleSpinBox
     export_button: QtWidgets.QPushButton
@@ -179,6 +284,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     iterations_label: QtWidgets.QLabel
     iterations_spinbox: QtWidgets.QSpinBox
     left_frame: QtWidgets.QFrame
+    main_layout: QtWidgets.QHBoxLayout
+    main_splitter: QtWidgets.QSplitter
     material_combo: MaterialComboBox
     material_label: QtWidgets.QLabel
     nonlinear_combo: NonlinearComboBox
@@ -187,11 +294,16 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     oversampling_label: QtWidgets.QLabel
     oversampling_spinbox: QtWidgets.QSpinBox
     params_label: QtWidgets.QLabel
+    per_step_spectra_label: QtWidgets.QLabel
     phase_blanking_checkbox: QtWidgets.QCheckBox
     phase_blanking_label: QtWidgets.QLabel
     phase_blanking_threshold_label: QtWidgets.QLabel
     phase_blanking_threshold_spinbox: QtWidgets.QDoubleSpinBox
+    plot_grid_layout: QtWidgets.QGridLayout
     plot_label: QtWidgets.QLabel
+    plot_position_auto_checkbox: QtWidgets.QCheckBox
+    plot_position_label: QtWidgets.QLabel
+    plot_position_spinbox: QtWidgets.QDoubleSpinBox
     plot_settings_label: QtWidgets.QLabel
     pulse_analysis_combo: PulseAnalysisComboBox
     pulse_analysis_label: QtWidgets.QLabel
@@ -201,11 +313,14 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     reconstructed_frequency_plot: PlotWidget
     reconstructed_time_plot: PlotWidget
     replot_button: QtWidgets.QPushButton
-    retrieved_radio: QtWidgets.QRadioButton
     retrieval_progress: QtWidgets.QProgressBar
+    retrieved_radio: QtWidgets.QRadioButton
     retriever_settings_label: QtWidgets.QLabel
     right_frame: QtWidgets.QFrame
+    right_frame_layout: QtWidgets.QVBoxLayout
     save_automatically_checkbox: QtWidgets.QCheckBox
+    save_automatically_label: QtWidgets.QLabel
+    save_plots_button: QtWidgets.QPushButton
     scan_button: QtWidgets.QPushButton
     scan_end_spinbox: QtWidgets.QDoubleSpinBox
     scan_progress: QtWidgets.QProgressBar
@@ -218,6 +333,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     scan_wavelength_low_spinbox: QtWidgets.QDoubleSpinBox
     solver_combo: SolverComboBox
     solver_label: QtWidgets.QLabel
+    spectra_per_step_spinbox: QtWidgets.QSpinBox
     spectrometer_label: QtWidgets.QLabel
     spectrometer_status_label: pydm.widgets.label.PyDMLabel
     spectrometer_suite_button: typhos.related_display.TyphosRelatedSuiteButton
@@ -225,10 +341,13 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     stage_label: QtWidgets.QLabel
     stage_status_label: pydm.widgets.label.PyDMLabel
     stage_suite_button: typhos.related_display.TyphosRelatedSuiteButton
-    take_fundamental_button: QtWidgets.QPushButton
     start_pos_label: QtWidgets.QLabel
+    take_fundamental_button: QtWidgets.QPushButton
+    time_frequency_frame: QtWidgets.QHBoxLayout
+    time_or_frequency_frame: QtWidgets.QFrame
     time_radio: QtWidgets.QRadioButton
     update_button: QtWidgets.QPushButton
+    updating_plots_label: QtWidgets.QLabel
     wedge_angle_label: QtWidgets.QLabel
     wedge_angle_spin: QtWidgets.QDoubleSpinBox
 
@@ -247,7 +366,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         else:
             self.devices = None
 
-        self.show_type_hints()
+        # self.show_type_hints()
         self.result = None
         self.acquisition_scan = None
         self.saved_filename = None
@@ -260,6 +379,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.data = dscan.Acquisition()
         self.update_button.clicked.connect(self._start_retrieval)
         self.import_button.clicked.connect(self._start_import)
+        self.save_plots_button.clicked.connect(self._save_plots)
         self.replot_button.clicked.connect(self._update_plots)
         self.retrieval_update.connect(self._on_retrieval_partial_update)
         self.retrieval_finished.connect(self._on_retrieval_finished)
@@ -280,12 +400,17 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         self.scan_button.clicked.connect(self._start_scan)
         self.new_scan_point.connect(self._on_new_scan_point)
+        self.updating_plots_label.setVisible(False)
         self.retrieval_progress.setVisible(False)
         self.scan_progress.setVisible(False)
         self._switch_plot()
         self._create_menus()
         self._connect_devices()
         self._update_title()
+        try:
+            self._load_settings()
+        except Exception:
+            logger.exception("Failed to load settings")
 
     def _connect_devices(self) -> None:
         if self.devices is None:
@@ -315,17 +440,77 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             )
 
     def _update_title(self) -> None:
-        if self.devices is not None:
-            prefix = self.devices.status.prefix
-        else:
-            prefix = None
+        title = "D-scan Diagnostic"
 
-        title = f"D-scan Diagnostic ({prefix})"
+        if self.devices is not None and self.devices.status.prefix:
+            title = f"{title} ({self.devices.status.prefix})"
 
         if self.saved_filename is not None:
             title = f"{title}: {self.saved_filename}"
 
         self.setWindowTitle(title)
+
+    def closeEvent(self, event: QtCore.QEvent):
+        try:
+            self._save_settings()
+        except Exception:
+            logger.exception("Failed to save settings")
+        finally:
+            super().closeEvent(event)
+
+    @property
+    def settings(self) -> QtCore.QSettings:
+        """The Qt settings object for storing parameters between launches."""
+        app = QtWidgets.QApplication.instance()
+        if app.organizationName() and app.applicationName():
+            return QtCore.QSettings()
+        return QtCore.QSettings(
+            "SLAC National Accelerator Laboratory",
+            "las-dispersion-scan",
+        )
+
+    def _save_settings(self):
+        """Save settings for the next launch."""
+        groups = {
+            "scan": self.scan_parameters,
+            "retrieval": self.retrieval_parameters,
+            "plot": self.plot_parameters,
+        }
+
+        # groups["retrieval"].pop("fund")
+        # groups["retrieval"].pop("scan")
+
+        settings = self.settings
+        for group, params in groups.items():
+            settings.beginGroup(group)
+            for key, value in params.items():
+                if isinstance(value, enum.Enum):
+                    value = value.value
+                settings.setValue(key, value)
+            settings.endGroup()
+
+    def _get_settings_group(self, group: str) -> Dict[str, Any]:
+        """Get QSettings group as a dictionary."""
+        settings = self.settings
+        settings.beginGroup(group)
+        return {key: settings.value(key, None) for key in settings.childKeys()}
+
+    def _load_settings(self):
+        """Load settings from the previous launch."""
+        try:
+            self.scan_parameters = self._get_settings_group("scan")
+        except Exception:
+            logger.warning("Failed to load scan parameters", exc_info=True)
+
+        try:
+            self.retrieval_parameters = self._get_settings_group("retrieval")
+        except Exception:
+            logger.warning("Failed to load retrieval parameters", exc_info=True)
+
+        try:
+            self.plot_parameters = self._get_settings_group("plot")
+        except Exception:
+            logger.warning("Failed to load plot parameters", exc_info=True)
 
     @QtCore.Slot(bool)
     def _save_automatically_checked(self, checked: bool) -> None:
@@ -379,9 +564,38 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
         directory = pathlib.Path(directory)
         self.data.save(directory, format="dat")
+        self._save_plots(filename_base=directory)
         self.saved_filename = f"{directory}/*.dat"
         self._update_title()
         return directory
+
+    def _save_plots(
+        self, *, filename_base: Optional[Union[pathlib.Path, str]] = None
+    ) -> Optional[pathlib.Path]:
+        if filename_base is None:
+            filename_base, filter_ = QtWidgets.QFileDialog.getSaveFileName(
+                self, "Save all plots", ".", "All files (*.*);;"
+            )
+            if not filename_base:
+                return
+
+        filename_base = pathlib.Path(filename_base).resolve()
+        filename_base = filename_base.with_name(filename_base.stem)
+        self.reconstructed_time_plot.figure.savefig(
+            f"{filename_base}_reconstructed_time.png", dpi=300
+        )
+        self.reconstructed_frequency_plot.figure.savefig(
+            f"{filename_base}_reconstructed_frequency.png", dpi=300
+        )
+        self.dscan_retrieved_plot.figure.savefig(
+            f"{filename_base}_retrieved.png", dpi=300
+        )
+        self.dscan_acquired_plot.figure.savefig(
+            f"{filename_base}_acquired.png", dpi=300
+        )
+        self.dscan_difference_plot.figure.savefig(
+            f"{filename_base}_difference.png", dpi=300
+        )
 
     def _save_as_npz(
         self, *, filename: Optional[Union[pathlib.Path, str]] = None
@@ -396,21 +610,41 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         filename = pathlib.Path(filename)
         self.data.settings = dict(**self.retrieval_parameters, **self.plot_parameters)
         self.data.save(filename, format="npz")
+        self._save_plots(filename_base=filename)
         self.saved_filename = filename
         self._update_title()
         return filename
 
+    @staticmethod
+    def _set_fundamental(data: dscan.Acquisition):
+        """
+        Automatically set the fundamental spectrum from the acquisition data.
+
+        Uses (approximately) the center scan position.
+        """
+        mid_position = len(data.scan.intensities) // 2
+        logger.warning(
+            "Setting fundamental spectra from the scan position: %.3f mm",
+            data.scan.positions[mid_position] * 1e3,  # m -> mm
+        )
+        intensities = data.scan.intensities[mid_position, :].copy()
+        data.fundamental.wavelengths = data.scan.wavelengths
+        data.fundamental.intensities = intensities
+
     @QtCore.Slot(object)
     def _on_scan_finished(self, data: dscan.ScanData):
+        """Scan finished callback slot."""
         self.scan_progress.setVisible(False)
         if self.retrieval_is_running:
             return
         if self.scan is not None and self.scan.stopped:
             return
 
-        if not len(self.data.fundamental.wavelengths):
-            self.data.fundamental.wavelengths = data.wavelengths
-            self.data.fundamental.intensities = data.intensities[0, :]
+        if (
+            not len(self.data.fundamental.wavelengths)
+            or self.auto_fundamental_checkbox.isChecked()
+        ):
+            self._set_fundamental(self.data)
 
         self._start_retrieval()
 
@@ -418,6 +652,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     def _on_retrieval_partial_update(
         self, result: dscan.PypretResult, iteration: int, data: List[np.ndarray]
     ):
+        """Retrieval process iteration callback slot."""
         self.retrieval_progress.setValue(iteration)
         # TODO: some sort of live view here?
         # mu, parameter, process_w, new_spectrum = data  # noqa
@@ -473,12 +708,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         autosave_suffix = self.get_autosave_date()
         path = self.auto_save_path / f"dscan_{autosave_suffix}.npz"
         self._save_as_npz(filename=path)
-        self.reconstructed_time_plot.figure.savefig(
-            self.auto_save_path / f"dscan_time_{autosave_suffix}.png"
-        )
-        self.dscan_retrieved_plot.figure.savefig(
-            self.auto_save_path / f"dscan_retrieved_{autosave_suffix}.png"
-        )
         self._scan_saved = True
         return path
 
@@ -539,7 +768,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
         self.scan_progress.setValue(data.index + 1)
         self.scan_status_label.setText(
-            f"Acquired [{data.index + 1}] at {data.readback * 1e-3} mm"
+            f"Acquired [{data.index + 1}] at {data.readback * 1e-3:.3g} mm"
         )
 
     def _start_scan(self) -> None:
@@ -560,6 +789,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             for point in self.scan.run(
                 positions=list(positions),
                 dwell_time=dwell_time,
+                per_step_spectra=self.spectra_per_step_spinbox.value(),
             ):
                 self.new_scan_point.emit(point)
 
@@ -627,9 +857,11 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 # between retrieval runs
                 np.random.seed(0)
             try:
-                result = dscan.PypretResult.from_data(**self.retrieval_parameters)
-                self.pypret_result = result
-                result.run(callback=per_step_callback_in_thread)
+                self._validate_retrieval_parameters()
+                self.pypret_result = dscan.PypretResult.from_data(
+                    **self.retrieval_parameters
+                )
+                self.pypret_result.run(callback=per_step_callback_in_thread)
             except Exception as ex:
                 if self._debug:
                     logger.warning(
@@ -642,7 +874,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                     embed()
                 raise
 
-            return result
+            return self.pypret_result
 
         def retrieval_finished(
             return_value: Optional[dscan.PypretResult], ex: Optional[Exception]
@@ -656,6 +888,16 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
 
             self.result = return_value
             self.pulse_length_lineedit.setText(f"{self.result.pulse_width_fs:.2f}")
+            if self.plot_position_auto_checkbox.isChecked():
+                self.plot_position_spinbox.setValue(
+                    self.result._final_plot_position * 1e3  # m -> mm
+                )
+
+            try:
+                self._save_settings()
+            except Exception:
+                logger.warning("Failed to save application settings: %s", ex)
+
             self.retrieval_finished.emit(self.pypret_result)
 
         iteration = 0
@@ -674,6 +916,8 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if self.result is None:
             return
 
+        self.updating_plots_label.setVisible(True)
+
         widgets = [
             self.reconstructed_time_plot,
             self.reconstructed_frequency_plot,
@@ -685,36 +929,72 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         for widget in widgets:
             widget.figure.clear()
 
-        self.result.plot_trace(
-            fig=self.dscan_acquired_plot.figure,
-            option=plotting.PlotTrace.measured,
+        self.update()
+        utils.process_events()
+        try:
+            self.dscan_acquired_plot.scan = self.result.scan
+            self.dscan_retrieved_plot.scan = self.result.scan
+            self.dscan_difference_plot.scan = self.result.scan
+
+            self.result.plot_trace(
+                fig=self.dscan_acquired_plot.figure,
+                option=plotting.PlotTrace.measured,
+            )
+
+            self.result.plot_trace(
+                fig=self.dscan_retrieved_plot.figure,
+                option=plotting.PlotTrace.retrieved,
+            )
+
+            self.result.plot_trace(
+                fig=self.dscan_difference_plot.figure,
+                option=plotting.PlotTrace.difference,
+            )
+
+            self.result.plot_frequency_domain_retrieval(
+                fig=self.reconstructed_frequency_plot.figure, **self.plot_parameters
+            )
+
+            self.result.plot_time_domain_retrieval(
+                fig=self.reconstructed_time_plot.figure, **self.plot_parameters
+            )
+
+            if self.debug_mode_checkbox.isChecked():
+                self.result.plot_all_debug(**self.plot_parameters)
+
+            for widget in widgets:
+                widget.draw()
+
+            self.replotted.emit()
+        finally:
+            self.updating_plots_label.setVisible(False)
+
+    @property
+    def scan_parameters(self) -> Dict[str, Any]:
+        """Parameters that specify a scan."""
+        return dict(
+            start=self.scan_start_spinbox.value(),
+            stop=self.scan_end_spinbox.value(),
+            num=self.scan_steps_spinbox.value(),
+            dwell_time=self.dwell_time_spinbox.value(),
+            auto_fundamental=self.auto_fundamental_checkbox.isChecked(),
+            per_step_spectra=self.spectra_per_step_spinbox.value(),
         )
 
-        self.result.plot_trace(
-            fig=self.dscan_retrieved_plot.figure,
-            option=plotting.PlotTrace.retrieved,
+    @scan_parameters.setter
+    def scan_parameters(self, parameters: Dict[str, Any]):
+        self._load_value_to_widget(self.scan_start_spinbox, parameters.get("start"))
+        self._load_value_to_widget(self.scan_end_spinbox, parameters.get("stop"))
+        self._load_value_to_widget(self.scan_steps_spinbox, parameters.get("num"))
+        self._load_value_to_widget(
+            self.dwell_time_spinbox, parameters.get("dwell_time")
         )
-
-        self.result.plot_trace(
-            fig=self.dscan_difference_plot.figure,
-            option=plotting.PlotTrace.difference,
+        self._load_value_to_widget(
+            self.auto_fundamental_checkbox, parameters.get("auto_fundamental")
         )
-
-        self.result.plot_frequency_domain_retrieval(
-            fig=self.reconstructed_frequency_plot.figure, **self.plot_parameters
+        self._load_value_to_widget(
+            self.spectra_per_step_spinbox, parameters.get("per_step_spectra")
         )
-
-        self.result.plot_time_domain_retrieval(
-            fig=self.reconstructed_time_plot.figure, **self.plot_parameters
-        )
-
-        if self.debug_mode_checkbox.isChecked():
-            self.result.plot_all_debug(**self.plot_parameters)
-
-        for widget in widgets:
-            widget.draw()
-
-        self.replotted.emit()
 
     @property
     def plot_parameters(self) -> Dict[str, Any]:
@@ -726,9 +1006,22 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             phase_blanking_threshold=self.phase_blanking_threshold_spinbox.value(),
         )
 
-    @property
-    def retrieval_parameters(self) -> Dict[str, Any]:
-        """Parameters to be passed to ``PypretResult.from_data``."""
+    @plot_parameters.setter
+    def plot_parameters(self, parameters: Dict[str, Any]):
+        self._load_value_to_widget(self.apply_limit_checkbox, parameters.get("limit"))
+        self._load_value_to_widget(
+            self.oversampling_spinbox, parameters.get("oversampling")
+        )
+        self._load_value_to_widget(
+            self.phase_blanking_checkbox, parameters.get("phase_blanking")
+        )
+        self._load_value_to_widget(
+            self.phase_blanking_threshold_spinbox,
+            parameters.get("phase_blanking_threshold"),
+        )
+
+    def _validate_retrieval_parameters(self):
+        """Check the retrieval parameters for consistency."""
         if (
             self.fundamental_low_spinbox.value()
             >= self.fundamental_high_spinbox.value()
@@ -749,6 +1042,14 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 "value."
             )
 
+    @property
+    def retrieval_parameters(self) -> Dict[str, Any]:
+        """Parameters to be passed to ``PypretResult.from_data``."""
+        if self.plot_position_auto_checkbox.isChecked():
+            plot_position = None
+        else:
+            plot_position = self.plot_position_spinbox.value()
+
         return dict(
             fund=self.data.fundamental,
             scan=self.data.scan,
@@ -768,5 +1069,66 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 self.scan_wavelength_low_spinbox.value(),
                 self.scan_wavelength_high_spinbox.value(),
             ),
-            plot_position=None,  # TODO
+            plot_position=plot_position,
         )
+
+    @retrieval_parameters.setter
+    def retrieval_parameters(self, parameters: Dict[str, Any]):
+        self._load_value_to_widget(self.material_combo, parameters.get("material"))
+        self._load_value_to_widget(self.pulse_analysis_combo, parameters.get("method"))
+        self._load_value_to_widget(self.nonlinear_combo, parameters.get("nlin_process"))
+        self._load_value_to_widget(self.wedge_angle_spin, parameters.get("wedge_angle"))
+        self._load_value_to_widget(
+            self.blur_sigma_spinbox, parameters.get("blur_sigma")
+        )
+        self._load_value_to_widget(
+            self.num_grid_points_spinbox, parameters.get("num_grid_points")
+        )
+        self._load_value_to_widget(
+            self.freq_bandwidth_spinbox, parameters.get("freq_bandwidth_wl")
+        )
+        self._load_value_to_widget(self.iterations_spinbox, parameters.get("max_iter"))
+        self._load_value_to_widget(
+            self.plot_position_spinbox, parameters.get("plot_position")
+        )
+
+        low, high = parameters.get("spec_fund_range", None) or [None, None]
+        self._load_value_to_widget(self.fundamental_low_spinbox, low)
+        self._load_value_to_widget(self.fundamental_high_spinbox, high)
+
+        low, high = parameters.get("spec_scan_range", None) or [None, None]
+        self._load_value_to_widget(self.scan_wavelength_low_spinbox, low)
+        self._load_value_to_widget(self.scan_wavelength_high_spinbox, high)
+
+    def _load_value_to_widget(self, widget: QtWidgets.QWidget, value: Any) -> None:
+        """
+        Update a widget with a value from QSettings.
+
+        Parameters
+        ----------
+        widget : QtWidgets.QWidget
+            The widget to update.
+        value : Any
+            The value from QSettings.
+        """
+        if value is None:
+            return
+
+        if isinstance(widget, QtWidgets.QCheckBox):
+            widget.setChecked(bool(value))
+        elif isinstance(widget, QtWidgets.QComboBox):
+            items = [widget.itemText(idx) for idx in range(widget.count())]
+            try:
+                index = items.index(str(value))
+            except ValueError:
+                ...
+            else:
+                widget.setCurrentIndex(index)
+        elif isinstance(widget, QtWidgets.QLineEdit):
+            widget.setText(str(value))
+        elif isinstance(widget, QtWidgets.QDoubleSpinBox):
+            widget.setValue(float(value))
+        elif isinstance(widget, QtWidgets.QSpinBox):
+            widget.setValue(int(value))
+        else:
+            logger.warning("Unhandled value loading widget: %s", widget)

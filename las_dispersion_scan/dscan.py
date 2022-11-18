@@ -212,7 +212,9 @@ class SpectrumData:
             cast(Sequence[float], device.spectrum.get())[: len(wavelengths)]
         )
         return cls(
-            wavelengths=wavelengths,
+            wavelengths=convert_to_meters(
+                wavelengths, getattr(device, "wavelength_units", "nm")
+            ),
             intensities=intensities,
         )
 
@@ -648,6 +650,7 @@ class AcquisitionScan:
         self,
         positions: List[float],
         dwell_time: float,
+        per_step_spectra: int = 1,
         timeout: float = 30.0,
     ) -> Generator[ScanPointData, None, None]:
         """
@@ -693,6 +696,31 @@ class AcquisitionScan:
                 stage=self.stage,
                 spectrometer=self.spectrometer,
             )
+
+            spectra = [data.spectrum]
+
+            while not self._stop and len(spectra) < per_step_spectra:
+                spectrum = SpectrumData.from_device(
+                    self.spectrometer
+                ).intensities.tolist()
+
+                if spectrum == spectra[-1]:
+                    time.sleep(dwell_time)
+                    continue
+
+                spectra.append(spectrum)
+
+            data.spectrum = np.average(np.asarray(spectra), axis=0).tolist()
+
+            if np.sum(data.spectrum) < 1e-6:
+                logger.warning(
+                    "Retrying scan point %d (%g); spectra was all zero",
+                    idx,
+                    setpoint,
+                )
+                time.sleep(0.1)
+                continue
+
             if all_data and data.spectrum == all_data[-1].spectrum:
                 logger.warning(
                     "Retrying scan point %d (%g); spectra identical to previous "
@@ -821,7 +849,7 @@ class PypretResult:
         )
 
     def plot_mesh_data(
-        self, data: Optional[pypret.MeshData] = None, scan_padding_nm: int = 75
+        self, data: Optional[pypret.MeshData] = None, scan_padding_nm: int = 0
     ) -> pypret.MeshDataPlot:
         """
         Plot the mesh scan data.
@@ -850,7 +878,7 @@ class PypretResult:
         return md
 
     def plot_processed_scan(
-        self, *, fig: Optional[plt.Figure] = None, scan_padding_nm: int = 75
+        self, *, fig: Optional[plt.Figure] = None, scan_padding_nm: int = 0
     ) -> pypret.MeshDataPlot:
         """
         Plot the processed mesh scan data from ``self.trace``.
@@ -968,9 +996,8 @@ class PypretResult:
 
         fx = EngFormatter(unit="s")
         ax1.xaxis.set_major_formatter(fx)
-        ax1.set_title(
-            f"time domain @ {self._final_plot_position:.3f} mm (FWHM = {fwhm} fs)"
-        )
+        plot_position_mm = self._final_plot_position * 1e3
+        ax1.set_title(f"time domain @ {plot_position_mm:.3f} mm (FWHM = {fwhm} fs)")
         ax1.set_xlabel("time")
         ax1.set_ylabel(yaxis.value)
         ax12.set_ylabel("phase (rad)")
@@ -1167,7 +1194,7 @@ class PypretResult:
             ax.yaxis.set_major_formatter(fy)
 
         ax.set_title(title)
-        scan_padding = 75  # (nm)
+        scan_padding = 0  # (nm)
         ax.set_xlim(
             2.99792 * 1e17 / (self.spec_scan_range[1] - scan_padding),
             2.99792 * 1e17 / (self.spec_scan_range[0] + scan_padding),
@@ -1381,10 +1408,10 @@ class PypretResult:
 
     @property
     def _final_plot_position(self):
-        """Final plot position for RetrievalResultPlot"""
+        """Final plot position for RetrievalResultPlot, in meters."""
         if self.plot_position is None:
             return self.scan.positions[self.optimum_fwhm_idx]
-        return self.plot_position
+        return self.plot_position * 1e-3
 
     def _get_retrieval_plot(self) -> RetrievalResultPlot:
         """
@@ -1465,7 +1492,7 @@ class PypretResult:
         -------
         PypretResult
         """
-        return PypretResult(
+        return cls(
             fund=copy.deepcopy(fund),
             scan=copy.deepcopy(scan),
             material=material,
