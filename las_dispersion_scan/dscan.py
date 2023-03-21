@@ -682,8 +682,7 @@ class AcquisitionScan:
 
         while remaining and not self._stop:
             idx, setpoint = remaining[0]
-            #self.stage.set(setpoint).wait(timeout=timeout)
-            self.stage.set(setpoint)
+            self.stage.set(setpoint).wait(timeout=timeout)
             t0 = time.monotonic()
             while not self._stop and time.monotonic() - t0 < dwell_time:
                 time.sleep(dwell_time / 10.0)
@@ -691,21 +690,6 @@ class AcquisitionScan:
             if self._stop:
                 break
 
-            n = 0
-            while abs(self.stage.wm()-setpoint)>0.01: # Then try again
-                n += 1
-                print("Stage is not in position, try # {}".format(n))
-                self.stage.move(setpoint, wait=False, timeout=timeout)
-                t0 = time.monotonic()
-                while not self._stop and time.monotonic() - t0 < dwell_time:
-                    time.sleep(1.0)
-
-                if self._stop:
-                    break
-
-                if n == 10:
-                    break
-                
             data = ScanPointData.from_devices(
                 index=idx,
                 setpoint=setpoint,
@@ -1585,7 +1569,10 @@ class PypretResult:
         )
 
         # Clean scan by truncating wavelength
-        (self.scan.wavelengths, self.scan.intensities,) = self.scan.truncate_wavelength(
+        (
+            self.scan.wavelengths,
+            self.scan.intensities,
+        ) = self.scan.truncate_wavelength(
             range_low=self.spec_scan_range[0] * 1e-9,
             range_high=self.spec_scan_range[1] * 1e-9,
         )
