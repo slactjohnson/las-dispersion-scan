@@ -682,7 +682,8 @@ class AcquisitionScan:
 
         while remaining and not self._stop:
             idx, setpoint = remaining[0]
-            self.stage.set(setpoint).wait(timeout=timeout)
+            #self.stage.set(setpoint).wait(timeout=timeout)
+            self.stage.set(setpoint)
             t0 = time.monotonic()
             while not self._stop and time.monotonic() - t0 < dwell_time:
                 time.sleep(dwell_time / 10.0)
@@ -690,6 +691,21 @@ class AcquisitionScan:
             if self._stop:
                 break
 
+            n = 0
+            while abs(self.stage.wm()-setpoint)>0.01: # Then try again
+                n += 1
+                print("Stage is not in position, try # {}".format(n))
+                self.stage.move(setpoint, wait=False, timeout=timeout)
+                t0 = time.monotonic()
+                while not self._stop and time.monotonic() - t0 < dwell_time:
+                    time.sleep(1.0)
+
+                if self._stop:
+                    break
+
+                if n == 10:
+                    break
+                
             data = ScanPointData.from_devices(
                 index=idx,
                 setpoint=setpoint,
@@ -712,7 +728,7 @@ class AcquisitionScan:
 
             data.spectrum = np.average(np.asarray(spectra), axis=0).tolist()
 
-            if np.sum(data.spectrum) < 1e-6:
+            if abs(np.sum(data.spectrum)) < 1e-6:
                 logger.warning(
                     "Retrying scan point %d (%g); spectra was all zero",
                     idx,
