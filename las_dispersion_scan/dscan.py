@@ -682,12 +682,14 @@ class AcquisitionScan:
 
         while remaining and not self._stop:
             idx, setpoint = remaining[0]
-            self.stage.set(setpoint).wait(timeout=timeout)
+            st = self.stage.set(setpoint)
             t0 = time.monotonic()
-            while not self._stop and time.monotonic() - t0 < dwell_time:
+            while not self._stop and not st.done and time.monotonic() - t0 < dwell_time:
+                # Busy loop so that we can monitor for user interruption.
                 time.sleep(dwell_time / 10.0)
 
             if self._stop:
+                logger.debug("Stop clicked; exiting the scan")
                 break
 
             data = ScanPointData.from_devices(
