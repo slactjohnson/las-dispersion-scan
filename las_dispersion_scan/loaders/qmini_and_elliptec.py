@@ -1,10 +1,6 @@
 import os
 
-import ophyd
-
-# from ..devices import Qmini
-from las_dispersion_scan.devices import Qmini
-from pcdsdevices.lasers import elliptec
+from ..devices import EllLinear, Qmini
 
 qmini_prefix = os.environ.get("QMINI_PREFIX", "LAS:LLN:QMINI:01")
 stage_prefix = os.environ.get("MOTOR_PREFIX", "LAS:ELL:LLN:TEST")
@@ -13,15 +9,4 @@ stage_name = os.environ.get("MOTOR_NAME", "las_lln_ell_01")
 motor_units = os.environ.get("MOTOR_UNITS", "mm")
 
 spectrometer = Qmini(qmini_prefix, name=qmini_name)
-
-if motor_units:
-
-    class EllLinear(elliptec.EllLinear):
-        @property
-        def egu(self) -> str:
-            return motor_units
-
-else:
-    EllLinear = elliptec.EllLinear
-
-stage = EllLinear(stage_prefix, name=stage_name, atol=0.010)
+stage = EllLinear(stage_prefix, name=stage_name, motor_units=motor_units, atol=0.010)

@@ -28,7 +28,7 @@ import scipy.interpolate
 from matplotlib.ticker import EngFormatter
 from scipy.ndimage import gaussian_filter
 
-from . import devices, plotting
+from . import devices, motion, plotting
 from .options import Material, NonlinearProcess, PulseAnalysisMethod, RetrieverSolver
 from .plotting import RetrievalResultPlot
 from .utils import RetrievalResultStandin, get_pulse_spectrum, preprocess
@@ -640,6 +640,7 @@ class AcquisitionScan:
     def stop(self):
         """Request to stop the scan."""
         self._stop = True
+        self.stage.stop()
 
     @property
     def stopped(self) -> bool:
@@ -659,6 +660,13 @@ class AcquisitionScan:
         # bluesky, what's that? *cough*
 
         self._stop = False
+
+        def sleep_with_stop_check(period: float) -> None:
+            t0 = time.monotonic()
+            sleep_period = min((period / 10.0, 0.1))
+            while not self._stop and time.monotonic() - t0 < period:
+                # Busy loop so that we can monitor for user interruption.
+                time.sleep(sleep_period)
 
         for dev in [self.stage, self.spectrometer]:
             try:
@@ -682,15 +690,24 @@ class AcquisitionScan:
 
         while remaining and not self._stop:
             idx, setpoint = remaining[0]
-            st = self.stage.set(setpoint)
-            t0 = time.monotonic()
-            while not self._stop and not st.done and time.monotonic() - t0 < dwell_time:
-                # Busy loop so that we can monitor for user interruption.
-                time.sleep(dwell_time / 10.0)
+            st = motion.move_with_retries(self.stage, setpoint)
+            try:
+                st.wait(timeout=timeout)
+            except TimeoutError:
+                logger.warning("Motion timed out; stopping the stage.")
+                self.stage.stop()
 
             if self._stop:
                 logger.debug("Stop clicked; exiting the scan")
                 break
+
+            if not st.success:
+                logger.debug(
+                    "Failed to move into position even after retries. "
+                    "Will continue trying until the user stops us."
+                )
+                sleep_with_stop_check(0.1)
+                continue
 
             data = ScanPointData.from_devices(
                 index=idx,
@@ -701,13 +718,17 @@ class AcquisitionScan:
 
             spectra = [data.spectrum]
 
+            # Wait for a single dwell period for the motor to settle into its
+            # final position. (TODO: separate parameter?)
+            sleep_with_stop_check(dwell_time)
+
             while not self._stop and len(spectra) < per_step_spectra:
                 spectrum = SpectrumData.from_device(
                     self.spectrometer
                 ).intensities.tolist()
 
                 if spectrum == spectra[-1]:
-                    time.sleep(dwell_time)
+                    sleep_with_stop_check(dwell_time)
                     continue
 
                 spectra.append(spectrum)
@@ -720,7 +741,7 @@ class AcquisitionScan:
                     idx,
                     setpoint,
                 )
-                time.sleep(0.1)
+                sleep_with_stop_check(0.1)
                 continue
 
             if all_data and data.spectrum == all_data[-1].spectrum:
@@ -730,7 +751,7 @@ class AcquisitionScan:
                     idx,
                     setpoint,
                 )
-                time.sleep(0.1)
+                sleep_with_stop_check(0.1)
                 continue
 
             all_data.append(data)
@@ -1558,9 +1579,13 @@ class PypretResult:
             range_low=self.spec_fund_range[0] * 1e-9,
             range_high=self.spec_fund_range[1] * 1e-9,
         )
-        logger.info(
-            f"Fundamental center wavelength: {self.fund.raw_center * 1e9:.1f} nm"
-        )
+
+        try:
+            fund_raw_center = self.fund.raw_center
+        except ZeroDivisionError as ex:
+            raise ValueError("Zero fundamental spectrum; unable to continue.") from ex
+
+        logger.info(f"Fundamental center wavelength: {fund_raw_center * 1e9:.1f} nm")
 
         ft = self._get_fourier_transform()
         logger.info(f"Time step = {ft.dt * 1e15:.2f} fs")
