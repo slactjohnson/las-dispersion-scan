@@ -261,6 +261,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     apply_limit_label: QtWidgets.QLabel
     auto_fundamental_checkbox: QtWidgets.QCheckBox
     auto_fundamental_label: QtWidgets.QLabel
+    auto_retrieve_pulse_checkbox: QtWidgets.QCheckBox
     blur_sigma_label: QtWidgets.QLabel
     blur_sigma_spinbox: QtWidgets.QSpinBox
     calculated_pulse_length_label: QtWidgets.QLabel
@@ -644,9 +645,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             not len(self.data.fundamental.wavelengths)
             or self.auto_fundamental_checkbox.isChecked()
         ):
+            logger.info("Setting fundamental spectrum")
             self._set_fundamental(self.data)
 
-        self._start_retrieval()
+        if self.auto_retrieve_pulse_checkbox.isChecked():
+            logger.info("Automatic retrieval enabled; starting...")
+            self._start_retrieval()
 
     @QtCore.Slot(object, int, list)
     def _on_retrieval_partial_update(
@@ -977,6 +981,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             stop=self.scan_end_spinbox.value(),
             num=self.scan_steps_spinbox.value(),
             dwell_time=self.dwell_time_spinbox.value(),
+            auto_retrieval=self.auto_retrieve_pulse_checkbox.isChecked(),
             auto_fundamental=self.auto_fundamental_checkbox.isChecked(),
             per_step_spectra=self.spectra_per_step_spinbox.value(),
         )
@@ -988,6 +993,9 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._load_value_to_widget(self.scan_steps_spinbox, parameters.get("num"))
         self._load_value_to_widget(
             self.dwell_time_spinbox, parameters.get("dwell_time")
+        )
+        self._load_value_to_widget(
+            self.auto_retrieve_pulse_checkbox, parameters.get("auto_retrieval")
         )
         self._load_value_to_widget(
             self.auto_fundamental_checkbox, parameters.get("auto_fundamental")
