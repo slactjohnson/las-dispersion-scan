@@ -2,14 +2,11 @@ import os
 
 from ophyd import Component as Cpt
 from ophyd import DerivedSignal, Signal
+from ophyd.pseudopos import real_position_argument
 from ophyd.signal import AttributeSignal
-from ophyd.pseudopos import (PseudoSingle, pseudo_position_argument,
-                             real_position_argument)
-from pcdsdevices.lasers import elliptec
 from pcdsdevices.pseudopos import SyncAxis
 
-from las_dispersion_scan.devices import Qmini
-from las_dispersion_scan.loaders.qmini_and_epicsmotor import EpicsMotor
+from ..devices import EllLinear, Qmini
 
 qmini_prefix = os.environ.get("QMINI_PREFIX", "LAS:LLN:QMINI:01")
 stage_prefix = os.environ.get("MOTOR_PREFIX", "IOC:TST:DScan:")
@@ -19,20 +16,26 @@ motor_units = os.environ.get("MOTOR_UNITS", "mm")
 
 spectrometer = Qmini(qmini_prefix, name=qmini_name)
 
-if motor_units:
-
-    class EllLinear(elliptec.EllLinear):
-        @property
-        def egu(self) -> str:
-            return motor_units
-
-else:
-    EllLinear = elliptec.EllLinear
-
 
 class DualElliptec(SyncAxis):
-    upstream = Cpt(EllLinear, '', port=0, channel=1, atol=0.05)
-    downstream = Cpt(EllLinear, '', port=0, channel=2, atol=0.05)
+    upstream = Cpt(
+        EllLinear,
+        "",
+        port=0,
+        channel=1,
+        atol=0.05,
+        motor_units=motor_units,
+        use_retries=True,
+    )
+    downstream = Cpt(
+        EllLinear,
+        "",
+        port=0,
+        channel=2,
+        atol=0.05,
+        motor_units=motor_units,
+        use_retries=True,
+    )
 
     user_setpoint = Cpt(AttributeSignal, attr="_user_setpoint_change")
     user_readback = Cpt(DerivedSignal, derived_from="sync.readback")
@@ -89,7 +92,6 @@ class DualElliptec(SyncAxis):
 
     @_user_setpoint_change.setter
     def _user_setpoint_change(self, value: float):
-        print("user setpoint changed", value)
         self.sync.move(value, wait=False)
 
     @property
@@ -115,14 +117,10 @@ class DualElliptec(SyncAxis):
         attr2 = real_pos._fields[1]
         pos2 = real_pos[1]
         calc2 = self.inverse_single(attr2, pos2)
-        calc = (calc1+calc2)/2
+        calc = (calc1 + calc2) / 2
         return self.PseudoPosition(sync=calc)
 
 
-stage = DualElliptec(
-    stage_prefix,
-    name=stage_name,
-    concurrent=True
-)
+stage = DualElliptec(stage_prefix, name=stage_name, concurrent=True)
 
-stage.warn_deadband=0.01
+stage.warn_deadband = 0.01

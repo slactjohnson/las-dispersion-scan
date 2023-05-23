@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Type, cast
 
 import ophyd
@@ -8,6 +9,9 @@ from ophyd import Component as Cpt
 from ophyd import EpicsSignal, Signal
 from ophyd.sim import make_fake_device
 from pcdsdevices.device import UpdateComponent as UCpt
+from pcdsdevices.lasers import elliptec
+
+from .motion import move_with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +58,6 @@ class Spectrometer(ophyd.Device):
     spectrum = Cpt(Signal)
     wavelengths = Cpt(Signal)
 
-    def stop(self):
-        ...
-
 
 class Qmini(qmini.QminiSpectrometer):
     start_acquisition = Cpt(Signal, doc="(No-op signal)")
@@ -68,8 +69,45 @@ class Qmini(qmini.QminiSpectrometer):
 
     wavelength_units = "nm"
 
-    def stop(self):
-        ...
+
+class EllLinear(elliptec.EllLinear):
+    def __init__(
+        self,
+        *args,
+        motor_units: str = "",
+        use_retries: bool = True,
+        **kwargs,
+    ):
+        self._motor_units = motor_units or os.environ.get("MOTOR_UNITS", "mm")
+        self._use_retries = use_retries
+        super().__init__(*args, **kwargs)
+
+    @property
+    def egu(self) -> str:
+        return self._motor_units
+
+    def set(
+        self,
+        position: float,
+        *,
+        wait: bool = True,
+        retry_timeout: float = 1.0,
+        retry_deadband: float = 0.01,
+        max_retries: int = 10,
+        timeout: float = 10.0,
+        **kwargs,
+    ):
+        if not self._use_retries:
+            return super().set(position, wait=wait)
+
+        return move_with_retries(
+            self,
+            position=position,
+            retry_timeout=retry_timeout,
+            retry_deadband=retry_deadband,
+            max_retries=max_retries,
+            timeout=timeout,
+        )
 
 
 FakeDScanStatus = cast(Type[DscanStatus], make_fake_device(DscanStatus))
