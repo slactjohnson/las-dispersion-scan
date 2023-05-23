@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import dataclasses
 import logging
-import os
 import pathlib
 import time
 from collections import deque
@@ -16,6 +15,7 @@ from typing import (
     Protocol,
     Sequence,
     Tuple,
+    TypeVar,
     Union,
     cast,
 )
@@ -128,69 +128,6 @@ class SpectrumData:
         return self.wavelengths[idx].copy(), self.intensities[idx].copy()
 
     @classmethod
-    def from_txt_file(cls, filename: str) -> SpectrumData:
-        """
-        Load fundamental spectrum data from the old .txt file format.
-
-        Parameters
-        ----------
-        filename : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        SpectrumData
-            The loaded data
-        """
-        return cls.from_file(filename)
-
-    @classmethod
-    def from_dat_file(cls, filename: str) -> SpectrumData:
-        """
-        Load fundamental spectrum data from the old .txt file format or the new
-        .dat format.
-
-        Parameters
-        ----------
-        filename : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        SpectrumData
-            The loaded data
-        """
-        return cls.from_file(filename)
-
-    @classmethod
-    def from_path(cls, path: Union[pathlib.Path, str]) -> SpectrumData:
-        """
-        Load spectra from either the old .txt file format or a the new .dat
-        file format, given a path.
-
-        Parameters
-        ----------
-        path : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        ScanData
-            The data from the scan.
-        """
-        try:
-            return cls.from_dat_file(os.path.join(path, "fund.dat"))
-        except FileNotFoundError:
-            ...
-
-        try:
-            return cls.from_txt_file(os.path.join(path, "fund_conv.txt"))
-        except FileNotFoundError:
-            ...
-
-        raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
-
-    @classmethod
     def from_device(cls, device: devices.Spectrometer) -> SpectrumData:
         """
         Acquire spectra from the given device.
@@ -216,44 +153,6 @@ class SpectrumData:
                 wavelengths, getattr(device, "wavelength_units", "nm")
             ),
             intensities=intensities,
-        )
-
-    @classmethod
-    def from_file(cls, path: Union[pathlib.Path, str]) -> SpectrumData:
-        """
-        Load fundamental spectrum data from the old .txt file format or the new
-        .dat format.
-
-        Parameters
-        ----------
-        path : str
-            Filename that contains the data.
-
-        Returns
-        -------
-        SpectrumData
-            The loaded data
-        """
-        fund_data = np.loadtxt(path)
-        wavelengths = fund_data[:, 0] * 1e-9
-        intensities = fund_data[:, 1]
-        intensities -= np.average(intensities[:7])
-        # intensities *= wavelengths * wavelengths
-        return cls(wavelengths, intensities)
-
-    def save_dat(self, filename: Union[str, pathlib.Path]):
-        """
-        Save the spectrum to the provided filename, in 'dat' format.
-
-        Parameters
-        ----------
-        filename : Union[str, pathlib.Path]
-            The filename to save to.
-        """
-        if len(self.wavelengths) == 0:
-            return
-        np.savetxt(
-            filename, np.column_stack((self.wavelengths * 1e9, self.intensities))
         )
 
     def get_background(self, *, count: int = 15) -> Tuple[np.ndarray, np.ndarray]:
@@ -385,100 +284,6 @@ class ScanData:
         idx = (self.wavelengths > range_low) & (self.wavelengths < range_high)
         return self.wavelengths[idx].copy(), self.intensities[:, idx].copy()
 
-    @classmethod
-    def from_txt_file(cls, filename: str) -> ScanData:
-        """
-        Load scan spectra from the "old" (original?) .txt file format.
-
-        Parameters
-        ----------
-        filename : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        ScanData
-            The data from the scan.
-        """
-        dscan_conv = np.loadtxt(filename)
-        result = np.empty([len(dscan_conv[0, 1:]), len(dscan_conv[:, 0])])
-        result[0, 1:] = dscan_conv[1:, 0].transpose()
-        result[1:, 0] = dscan_conv[0, 2:].transpose()
-        result[1:, 1:] = dscan_conv[1:, 2:].transpose()
-        return cls(
-            positions=result[0],
-            wavelengths=result[1],
-            intensities=result[2],
-        )
-
-    @classmethod
-    def from_dat_file(cls, filename: str) -> ScanData:
-        """
-        Load scan positions and spectra from the new .dat format.
-
-        Parameters
-        ----------
-        filename : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        ScanData
-            The data from the scan.
-        """
-        scan_data = np.loadtxt(filename)
-        positions = scan_data[0, 1:] * 1e-3
-        wavelengths = scan_data[1:, 0] * 1e-9
-        intensities = scan_data[1:, 1:].transpose()
-        intensities /= np.amax(intensities)
-        return cls(positions, wavelengths, intensities)
-
-    def save_dat(self, filename: Union[str, pathlib.Path]):
-        """
-        Save the scan data to the provided filename, in 'dat' format.
-
-        Parameters
-        ----------
-        filename : Union[str, pathlib.Path]
-            The filename to save to.
-        """
-        if len(self.positions) == 0:
-            return
-
-        data = np.zeros((len(self.wavelengths) + 1, len(self.positions) + 1))
-        data[0, 1:] = self.positions * 1e3
-        data[1:, 0] = self.wavelengths * 1e9
-        data[1:, 1:] = self.intensities.transpose()
-        np.savetxt(filename, data)
-
-    @classmethod
-    def from_path(cls, path: Union[pathlib.Path, str]) -> ScanData:
-        """
-        Load scan positions and spectra from either the old .txt file format
-        or a the new .dat file format, given a path.
-
-        Parameters
-        ----------
-        path : str
-            Directory where the old files are to be found.
-
-        Returns
-        -------
-        ScanData
-            The data from the scan.
-        """
-        try:
-            return cls.from_dat_file(os.path.join(path, "scan.dat"))
-        except FileNotFoundError:
-            ...
-
-        try:
-            return cls.from_txt_file(os.path.join(path, "dscan_conv.txt"))
-        except FileNotFoundError:
-            ...
-
-        raise FileNotFoundError(f"No supported .dat or .txt file found in {path}")
-
 
 @dataclasses.dataclass
 class Acquisition:
@@ -494,8 +299,7 @@ class Acquisition:
         Parameters
         ----------
         path : str
-            Directory where the old files are to be found, or a direct path
-            to a .npz file.
+            Path to the numpy npz file.
 
         Returns
         -------
@@ -503,40 +307,36 @@ class Acquisition:
             The data from the scan.
         """
         path = pathlib.Path(path)
-        if path.suffix.lower() == ".npz":
-            loaded = np.load(path, allow_pickle=True)
-            try:
-                settings = loaded["settings"][()]
-            except Exception:
-                settings = {}
-                logger.exception("Failed to unpickle settings from the file")
-
-            return cls(
-                fundamental=SpectrumData(
-                    wavelengths=loaded["fund_wavelengths"],
-                    intensities=loaded["fund_intensities"],
-                ),
-                scan=ScanData(
-                    positions=loaded["positions"],
-                    wavelengths=loaded["wavelengths"],
-                    intensities=loaded["intensities"],
-                ),
-                settings=settings,
-            )
+        loaded = np.load(path, allow_pickle=True)
+        try:
+            settings = loaded["settings"][()]
+        except Exception:
+            settings = {}
+            logger.exception("Failed to unpickle settings from the file")
 
         return cls(
-            fundamental=SpectrumData.from_path(path),
-            scan=ScanData.from_path(path),
+            fundamental=SpectrumData(
+                wavelengths=loaded["fund_wavelengths"],
+                intensities=loaded["fund_intensities"],
+            ),
+            scan=ScanData(
+                positions=loaded["positions"],
+                wavelengths=loaded["wavelengths"],
+                intensities=loaded["intensities"],
+            ),
+            settings=settings,
         )
 
     def save(self, path: Union[pathlib.Path, str], format: str = "npz") -> None:
         """
-        Save acquisition data to a single 'npz' file or multiple 'dat' files.
+        Save acquisition data to a single numpy 'npz' file.
 
         Parameters
         ----------
         path : str or pathlib.Path
-            Filename (npz) or directory (dat) to save to.
+            Filename to save to, including the file extension.
+        format : str, optional
+            Save to this format.  Currently, only 'npz' is supported.
         """
         path = pathlib.Path(path)
         if format == "npz":
@@ -551,14 +351,6 @@ class Acquisition:
                 intensities=self.scan.intensities,
                 settings=np.array(self.settings, dtype=object),
             )
-            return
-
-        if format == "dat":
-            if not path.is_dir():
-                raise ValueError(f"{path} is not a directory name to save to")
-            self.fundamental.save_dat(path / "fund.dat")
-            self.scan.save_dat(path / "scan.dat")
-            return
 
         raise ValueError(f"Unsupported format {format}")
 
@@ -572,7 +364,10 @@ class Callback(Protocol):
         ...
 
 
-def convert_to_meters(value: float, units: str) -> float:
+T = TypeVar("T", np.ndarray, float)
+
+
+def convert_to_meters(value: T, units: str) -> T:
     """
     Convert the provided value to meters.
 
@@ -593,7 +388,7 @@ def convert_to_meters(value: float, units: str) -> float:
         "um": 1.0e-6,
         "nm": 1.0e-9,
     }[units]
-    return factor * value
+    return cast(T, value * factor)
 
 
 @dataclasses.dataclass

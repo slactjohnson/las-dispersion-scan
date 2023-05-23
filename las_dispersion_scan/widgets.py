@@ -385,6 +385,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.retrieval_update.connect(self._on_retrieval_partial_update)
         self.retrieval_finished.connect(self._on_retrieval_finished)
         self.take_fundamental_button.clicked.connect(self.take_fundamental)
+        self.export_button.clicked.connect(self._save_as_npz)
         self.save_automatically_checkbox.toggled.connect(
             self._save_automatically_checked
         )
@@ -405,7 +406,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.retrieval_progress.setVisible(False)
         self.scan_progress.setVisible(False)
         self._switch_plot()
-        self._create_menus()
         self._connect_devices()
         self._update_title()
         try:
@@ -536,12 +536,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self.dscan_retrieved_plot.setVisible(self.retrieved_radio.isChecked())
 
     def _create_menus(self):
-        self._export_menu = QtWidgets.QMenu()
-        npz_export = self._export_menu.addAction("Save as one .npz file")
-        npz_export.triggered.connect(self._save_as_npz)
-        dat_export = self._export_menu.addAction("Save as separate .dat files")
-        dat_export.triggered.connect(self._save_as_dat)
-        self.export_button.setMenu(self._export_menu)
+        ...
 
     @property
     def retrieval_is_running(self) -> bool:
@@ -552,23 +547,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     def scan_is_running(self) -> bool:
         """Is the scan thread running?"""
         return self._scan_thread is not None and self._scan_thread.isRunning()
-
-    def _save_as_dat(
-        self, *, directory: Optional[Union[pathlib.Path, str]] = None
-    ) -> Optional[pathlib.Path]:
-        if directory is None:
-            directory = QtWidgets.QFileDialog.getExistingDirectory(
-                self, "Directory to save files (fund.dat; scan.dat)"
-            )
-            if not directory:
-                return
-
-        directory = pathlib.Path(directory)
-        self.data.save(directory, format="dat")
-        self._save_plots(filename_base=directory)
-        self.saved_filename = f"{directory}/*.dat"
-        self._update_title()
-        return directory
 
     def _save_plots(
         self, *, filename_base: Optional[Union[pathlib.Path, str]] = None
@@ -729,12 +707,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         plt.show()
 
     def load_path(self, path: Union[str, pathlib.Path]) -> None:
-        """
-        Load data from the provided path.
-
-        Filenames matching the supported data formats are searched in order of
-        "new" (.dat) to "old" (.txt).
-        """
+        """Load data from the provided path."""
         path = pathlib.Path(path).resolve()
         self.data = dscan.Acquisition.from_path(str(path))
         self.saved_filename = path
@@ -748,8 +721,6 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             ";;".join(
                 (
                     "Numpy zip file (*.npz)",
-                    "Newer .dat file format (*.dat)",
-                    "Original text file format (*.txt)",
                     "All files (*.*)",
                 )
             ),
@@ -757,17 +728,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         if not filename:
             return
 
-        path = pathlib.Path(filename)
-        if path.suffix.lower() in (".dat", ".txt"):
-            logger.warning(
-                "Old Importing old file format: ignoring filename %s "
-                "The GUI will load either .dat or .txt from %s",
-                path.name,
-                path.parent,
-            )
-            path = path.parent
-
-        self.load_path(path)
+        self.load_path(pathlib.Path(filename))
 
     def _on_new_scan_point(self, data: dscan.ScanPointData) -> None:
         self.scan_progress.setValue(data.index + 1)
