@@ -728,6 +728,9 @@
          <property name="toolTip">
           <string>Each step, take this number of spectra and use the average</string>
          </property>
+         <property name="suffix">
+          <string> spectra</string>
+         </property>
          <property name="minimum">
           <number>1</number>
          </property>
@@ -812,7 +815,7 @@
           </sizepolicy>
          </property>
          <property name="text">
-          <string>&amp;Per-step spectra</string>
+          <string>A&amp;veraging</string>
          </property>
          <property name="buddy">
           <cstring>spectra_per_step_spinbox</cstring>
@@ -1138,6 +1141,25 @@
          </property>
         </widget>
        </item>
+       <item row="6" column="2">
+        <widget class="QSpinBox" name="scan_count_spinbox">
+         <property name="toolTip">
+          <string>Run this many scans, combine results from each scan, and average all data for the final result</string>
+         </property>
+         <property name="suffix">
+          <string> scan(s)</string>
+         </property>
+         <property name="minimum">
+          <number>1</number>
+         </property>
+         <property name="maximum">
+          <number>100</number>
+         </property>
+         <property name="value">
+          <number>1</number>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QFrame" name="right_frame">
@@ -1413,6 +1435,7 @@
   <tabstop>scan_wavelength_high_spinbox</tabstop>
   <tabstop>scan_steps_spinbox</tabstop>
   <tabstop>spectra_per_step_spinbox</tabstop>
+  <tabstop>scan_count_spinbox</tabstop>
   <tabstop>dwell_time_spinbox</tabstop>
   <tabstop>auto_fundamental_checkbox</tabstop>
   <tabstop>auto_retrieve_pulse_checkbox</tabstop>

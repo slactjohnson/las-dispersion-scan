@@ -323,6 +323,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
     save_automatically_label: QtWidgets.QLabel
     save_plots_button: QtWidgets.QPushButton
     scan_button: QtWidgets.QPushButton
+    scan_count_spinbox: QtWidgets.QSpinBox
     scan_end_spinbox: QtWidgets.QDoubleSpinBox
     scan_progress: QtWidgets.QProgressBar
     scan_start_spinbox: QtWidgets.QDoubleSpinBox
@@ -945,6 +946,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             auto_retrieval=self.auto_retrieve_pulse_checkbox.isChecked(),
             auto_fundamental=self.auto_fundamental_checkbox.isChecked(),
             per_step_spectra=self.spectra_per_step_spinbox.value(),
+            num_scans=self.scan_count_spinbox.value(),
         )
 
     @scan_parameters.setter
