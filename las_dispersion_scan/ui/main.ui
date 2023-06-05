@@ -991,6 +991,9 @@
          <property name="toolTip">
           <string>Number of steps over the scan range (calculated by np.linspace)</string>
          </property>
+         <property name="suffix">
+          <string> steps</string>
+         </property>
          <property name="minimum">
           <number>5</number>
          </property>

@@ -756,6 +756,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
                 positions=list(positions),
                 dwell_time=dwell_time,
                 per_step_spectra=self.spectra_per_step_spinbox.value(),
+                num_average_scans=self.scan_count_spinbox.value(),
             ):
                 self.new_scan_point.emit(point)
 
@@ -793,7 +794,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._scan_thread.returned.connect(scan_finished)
         self.scan_progress.setMinimum(0)
         self.scan_progress.setValue(0)
-        self.scan_progress.setMaximum(self.scan_steps_spinbox.value())
+        self.scan_progress.setMaximum(self.total_points)
         self.scan_progress.setVisible(True)
 
         self.scan_button.setText("&Stop")
@@ -936,9 +937,14 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
             self.updating_plots_label.setVisible(False)
 
     @property
+    def total_points(self) -> int:
+        """Total scan points requested with scan averaging."""
+        return self.scan_steps_spinbox.value() * self.scan_count_spinbox.value()
+
+    @property
     def scan_parameters(self) -> Dict[str, Any]:
         """Parameters that specify a scan."""
-        return dict(
+        return dict(  # noqa: C408
             start=self.scan_start_spinbox.value(),
             stop=self.scan_end_spinbox.value(),
             num=self.scan_steps_spinbox.value(),
@@ -966,11 +972,12 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         self._load_value_to_widget(
             self.spectra_per_step_spinbox, parameters.get("per_step_spectra")
         )
+        self._load_value_to_widget(self.scan_count_spinbox, parameters.get("num_scans"))
 
     @property
     def plot_parameters(self) -> Dict[str, Any]:
         """Parameters to be passed to ``PypretResult.plot*`` methods."""
-        return dict(
+        return dict(  # noqa: C408
             limit=self.apply_limit_checkbox.isChecked(),
             oversampling=self.oversampling_spinbox.value(),
             phase_blanking=self.phase_blanking_checkbox.isChecked(),
@@ -1021,7 +1028,7 @@ class DscanMain(DesignerDisplay, QtWidgets.QWidget):
         else:
             plot_position = self.plot_position_spinbox.value()
 
-        return dict(
+        return dict(  # noqa: C408
             fund=self.data.fundamental,
             scan=self.data.scan,
             material=self.material_combo.current_enum_value,

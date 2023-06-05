@@ -284,6 +284,64 @@ class ScanData:
         idx = (self.wavelengths > range_low) & (self.wavelengths < range_high)
         return self.wavelengths[idx].copy(), self.intensities[:, idx].copy()
 
+    @classmethod
+    def from_multiple_scans(
+        cls,
+        scan_points: int,
+        num_average_scans: int,
+        positions: np.ndarray,
+        wavelengths: np.ndarray,
+        intensities: np.ndarray,
+    ) -> ScanData:
+        """Average the results from multiple scans into one."""
+        while (
+            num_average_scans > 1 and len(positions) < scan_points * num_average_scans
+        ):
+            # If the scan was stopped early, average what we do have
+            num_average_scans -= 1
+            count = num_average_scans * scan_points
+            positions = positions[:count]
+            intensities = intensities[:count]
+
+        if num_average_scans == 0 or len(positions) < scan_points:
+            # Return whatever we have - it's not even one scan's worth
+            return ScanData(
+                positions=positions,
+                wavelengths=wavelengths,
+                intensities=intensities,
+            )
+
+        try:
+            positions = positions.reshape((num_average_scans, scan_points))
+            intensities = intensities.reshape(
+                (num_average_scans, scan_points, intensities.shape[-1])
+            )
+        except ValueError as ex:
+            raise RuntimeError(
+                f"Unable to reshape the acquired data: "
+                f"pos={positions.shape} intensity={intensities.shape} "
+                f"but expected points={scan_points} (averaged over "
+                f"{num_average_scans})"
+            ) from ex
+
+        positions = np.average(positions, axis=0)
+        intensities = np.average(intensities, axis=0)
+
+        # Sanity check - can remove
+        if len(positions) != scan_points or len(intensities) != scan_points:
+            raise RuntimeError(
+                f"Reshaping the averaged scans didn't work as expected: "
+                f"Reshaped into pos={positions.shape} intensity={intensities.shape} "
+                f"but expected points={scan_points} (averaged over "
+                f"{num_average_scans})"
+            )
+
+        return ScanData(
+            positions=positions,
+            intensities=intensities,
+            wavelengths=wavelengths,
+        )
+
 
 @dataclasses.dataclass
 class Acquisition:
@@ -446,6 +504,7 @@ class AcquisitionScan:
         self,
         positions: List[float],
         dwell_time: float,
+        num_average_scans: int = 1,
         per_step_spectra: int = 1,
         timeout: float = 30.0,
     ) -> Generator[ScanPointData, None, None]:
@@ -480,7 +539,7 @@ class AcquisitionScan:
             )
 
         initial_position = self.stage.user_readback.get()
-        remaining = deque(enumerate(positions))
+        remaining = deque(enumerate(tuple(positions) * num_average_scans))
         all_data = []
 
         while remaining and not self._stop:
@@ -554,11 +613,23 @@ class AcquisitionScan:
             yield data
 
         if all_data:
-            self.data = ScanData(
-                positions=np.asarray([data.readback for data in all_data]),
-                wavelengths=np.asarray(all_data[-1].wavelengths),
-                intensities=np.asarray([data.spectrum for data in all_data]),
-            )
+            data_positions = np.asarray([data.readback for data in all_data])
+            wavelengths = np.asarray(all_data[-1].wavelengths)
+            intensities = np.asarray([data.spectrum for data in all_data])
+            if num_average_scans > 1:
+                self.data = ScanData.from_multiple_scans(
+                    len(positions),
+                    num_average_scans,
+                    positions=data_positions,
+                    wavelengths=wavelengths,
+                    intensities=intensities,
+                )
+            else:
+                self.data = ScanData(
+                    positions=data_positions,
+                    wavelengths=wavelengths,
+                    intensities=intensities,
+                )
 
         self.stage.move(initial_position, wait=False)
 
