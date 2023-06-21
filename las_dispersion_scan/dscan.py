@@ -409,6 +409,7 @@ class Acquisition:
                 intensities=self.scan.intensities,
                 settings=np.array(self.settings, dtype=object),
             )
+            return
 
         raise ValueError(f"Unsupported format {format}")
 
